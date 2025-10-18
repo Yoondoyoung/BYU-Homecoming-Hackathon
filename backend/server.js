@@ -18,6 +18,7 @@ const PORT = process.env.PORT || 4001;
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const voteRoutes = require('./routes/votes');
 
 // Middleware
 app.use(cors({
@@ -42,13 +43,17 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
-      auth: '/api/auth/*'
+      auth: '/api/auth/*',
+      votes: '/api/votes/*'
     }
   });
 });
 
 // Auth routes
 app.use('/api/auth', authRoutes);
+
+// Vote routes
+app.use('/api/votes', voteRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

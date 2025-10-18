@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import io from "socket.io-client";
 import SpotChat from "./SpotChat";
+import VoteComponent from "./VoteComponent";
 import "./mapbox.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
@@ -15,6 +16,7 @@ export default function MapBox() {
   const [socket, setSocket] = useState(null);
   const [nickname, setNickname] = useState('');
   const [showSpotChat, setShowSpotChat] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
 
   // Spot data (BYU campus example)
   const [spots] = useState([
@@ -253,14 +255,14 @@ export default function MapBox() {
       paint: { "text-color": "#111" },
     });
 
-    // Popup
+    // Popup - 투표 컴포넌트로 변경
     map.current.on("click", "spot-symbols", (e) => {
       const f = e.features[0];
-      const { name, owner } = f.properties;
-      new mapboxgl.Popup({ offset: 15 })
-        .setLngLat(f.geometry.coordinates)
-        .setHTML(`<b>${name}</b><br/>현재 점령: ${owner}`)
-        .addTo(map.current);
+      const { name, id } = f.properties;
+      setSelectedBuilding({
+        id: id,
+        name: name
+      });
     });
   };
 
@@ -417,6 +419,13 @@ export default function MapBox() {
             </button>
           </div>
         </div>
+      )}
+      {selectedBuilding && (
+        <VoteComponent
+          buildingId={selectedBuilding.id}
+          buildingName={selectedBuilding.name}
+          onClose={() => setSelectedBuilding(null)}
+        />
       )}
     </div>
   );
