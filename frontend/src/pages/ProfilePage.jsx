@@ -78,6 +78,14 @@ const ProfilePage = ({ onUserUpdate }) => {
   };
 
   const handleSave = async () => {
+    // 성별 선택 확인
+    if (!profile.gender) {
+      alert('Please select your gender.');
+      setMessage('Gender is required.');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+
     try {
       setSaving(true);
       // localStorage에서 토큰 가져오기
@@ -190,11 +198,12 @@ const ProfilePage = ({ onUserUpdate }) => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="gender">Gender</label>
+                <label htmlFor="gender">Gender *</label>
                 <select
                   id="gender"
                   value={profile.gender}
                   onChange={(e) => handleInputChange('gender', e.target.value)}
+                  required
                 >
                   <option value="">Select gender</option>
                   <option value="male">Male</option>
