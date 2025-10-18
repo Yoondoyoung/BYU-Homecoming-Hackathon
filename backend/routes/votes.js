@@ -187,61 +187,77 @@ router.post('/vote', authenticateToken, async (req, res) => {
       });
     }
 
+    // If vote exists, check if it's on a different day (date-based, not 24 hours)
     if (existingVote) {
-      // Update existing vote (using Service Role Key to bypass RLS)
-      const { data: updatedVote, error: updateError } = await supabaseAdmin
-        .from('building_votes')
-        .update({ 
-          vote_option: voteOption,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingVote.id)
-        .select()
-        .single();
+      const voteDate = new Date(existingVote.created_at);
+      const now = new Date();
+      
+      // Convert both dates to UTC and get just the date part (YYYY-MM-DD)
+      const voteDateString = voteDate.toISOString().split('T')[0];
+      const todayDateString = now.toISOString().split('T')[0];
+      
+      console.log(`📅 Vote date: ${voteDateString}, Today: ${todayDateString}`);
 
-      if (updateError) {
-        console.error('Error updating vote:', updateError);
-        return res.status(500).json({ 
-          error: 'Failed to update vote',
-          message: 'Failed to update vote.' 
+      // Check if vote was made today
+      if (voteDateString === todayDateString) {
+        // Same day - cannot vote again
+        const midnight = new Date(now);
+        midnight.setHours(24, 0, 0, 0); // Next midnight
+        const hoursUntilMidnight = Math.ceil((midnight - now) / (1000 * 60 * 60));
+        
+        return res.status(403).json({ 
+          error: 'Already voted today',
+          message: `You have already voted for this building today. You can vote again after midnight (in ${hoursUntilMidnight} hours).`,
+          existingVote: existingVote.vote_option,
+          hoursUntilMidnight: hoursUntilMidnight,
+          canVoteAt: midnight.toISOString()
         });
       }
 
-      res.json({
-        message: 'Vote updated successfully.',
-        vote: updatedVote,
-        distance: Math.round(distance)
-      });
-    } else {
-      // Create new vote (using Service Role Key to bypass RLS)
-      const { data: newVote, error: insertError } = await supabaseAdmin
+      // Different day - delete old vote and allow new one
+      console.log('📅 Different day detected - deleting old vote');
+      const { error: deleteError } = await supabaseAdmin
         .from('building_votes')
-        .insert({
-          building_id: buildingId,
-          user_id: userId,
-          vote_option: voteOption,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+        .delete()
+        .eq('id', existingVote.id);
 
-      if (insertError) {
-        console.error('❌ Error creating vote:', insertError);
+      if (deleteError) {
+        console.error('Error deleting old vote:', deleteError);
         return res.status(500).json({ 
-          error: 'Failed to create vote',
-          message: 'Failed to create vote.',
-          details: insertError.message
+          error: 'Failed to delete old vote',
+          message: 'An error occurred while deleting old vote.' 
         });
       }
+    }
 
-      console.log('✅ Vote created successfully:', newVote);
-      res.json({
-        message: 'Vote submitted successfully.',
-        vote: newVote,
-        distance: Math.round(distance)
+    // Create new vote (either first time or new day)
+    const { data: newVote, error: insertError } = await supabaseAdmin
+      .from('building_votes')
+      .insert({
+        building_id: buildingId,
+        user_id: userId,
+        vote_option: voteOption,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('❌ Error creating vote:', insertError);
+      return res.status(500).json({ 
+        error: 'Failed to create vote',
+        message: 'Failed to create vote.',
+        details: insertError.message
       });
     }
+
+    console.log('✅ Vote created successfully:', newVote);
+    res.json({
+      message: 'Vote submitted successfully.',
+      vote: newVote,
+      distance: Math.round(distance)
+    });
   } catch (error) {
     console.error('Vote error:', error);
     res.status(500).json({ 
