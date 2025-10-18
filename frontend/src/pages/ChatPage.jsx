@@ -1,6 +1,6 @@
 import React from 'react';
-import ChatRoom from '../components/ChatRoom';
-import './ChatPage.css';
+import ChatRoom from '../components/ChatRoom.jsx';
+import '../styles/ChatPage.css';
 
 function ChatPage() {
   return (

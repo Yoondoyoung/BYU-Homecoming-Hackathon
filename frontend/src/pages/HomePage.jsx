@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import './HomePage.css';
+import '../styles/HomePage.css';
 
 function HomePage() {
   const [healthStatus, setHealthStatus] = useState(null);

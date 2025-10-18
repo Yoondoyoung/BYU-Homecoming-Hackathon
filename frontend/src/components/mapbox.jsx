@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import io from "socket.io-client";
-import SpotChat from "./SpotChat";
-import VoteComponent from "./VoteComponent";
-import "./mapbox.css";
+import SpotChat from "./SpotChat.jsx";
+import VoteComponent from "./VoteComponent.jsx";
+import "../styles/mapbox.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
 

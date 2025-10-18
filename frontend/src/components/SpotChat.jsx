@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import "./SpotChat.css";
+import "../styles/SpotChat.css";
 
 export default function SpotChat({ socket, currentSpot, nickname, onClose }) {
   const [message, setMessage] = useState("");

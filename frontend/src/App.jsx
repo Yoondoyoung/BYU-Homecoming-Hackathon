@@ -1,12 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import HomePage from './pages/HomePage';
-import MapPage from './pages/MapPage';
-import ChatPage from './pages/ChatPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import ProtectedRoute from './components/ProtectedRoute';
-import './App.css';
+import HomePage from './pages/HomePage.jsx';
+import MapPage from './pages/MapPage.jsx';
+import ChatPage from './pages/ChatPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+import './styles/App.css';
 
 function App() {
   return (

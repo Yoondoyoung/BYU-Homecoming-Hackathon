@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './VoteComponent.css';
+import '../styles/VoteComponent.css';
 
 const VoteComponent = ({ buildingId, buildingName, onClose }) => {
   const [voteData, setVoteData] = useState({

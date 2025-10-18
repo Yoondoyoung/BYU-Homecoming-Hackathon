@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import MapBox from '../components/mapbox';
-import './MapPage.css';
+import MapBox from '../components/mapbox.jsx';
+import '../styles/MapPage.css';
 
 function MapPage() {
   const [user, setUser] = useState(null);
