@@ -1,20 +1,28 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import io from 'socket.io-client';
 import '../styles/DirectChat.css';
 
 function DirectChat({
-  socket,
+  socket: externalSocket,
   currentUser,
   targetUser,
   conversationId: conversationIdProp,
   initialMessages = [],
   isOpen,
   isInitiator = false,
-  onClose
+  onClose,
+  conversationTopics = null
 }) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState(initialMessages);
   const [participantCount, setParticipantCount] = useState(1);
+  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(true);
   const messagesEndRef = useRef(null);
+  
+  // Socket 인스턴스 생성 (externalSocket이 없으면 내부에서 생성)
+  const socket = useMemo(() => {
+    return externalSocket || io('http://localhost:4001');
+  }, [externalSocket]);
 
   const conversationId = useMemo(() => {
     if (conversationIdProp) return conversationIdProp;
@@ -26,6 +34,26 @@ function DirectChat({
   const selfDisplayName = currentUser?.nickname || currentUser?.name || 'You';
   const partnerDisplayName = targetUser?.nickname || targetUser?.name || 'Friend';
   const partnerInitial = partnerDisplayName ? partnerDisplayName.charAt(0).toUpperCase() : '?';
+
+  const handleSuggestedQuestionClick = (question) => {
+    setMessage(question);
+    setShowSuggestedQuestions(false); // 질문 선택 후 추천 질문 숨기기
+    
+    // 바로 메시지 전송
+    setTimeout(() => {
+      if (socket && conversationId && currentUser?.id) {
+        socket.emit('sendDirectMessage', {
+          conversationId,
+          message: question,
+          senderId: currentUser?.id,
+          senderNickname: selfDisplayName,
+          recipientId: targetUser?.id,
+          senderProfileImage: currentUser?.profile_image_url
+        });
+        setMessage(''); // 입력창 비우기
+      }
+    }, 100); // 약간의 지연을 두어 UI 업데이트 후 전송
+  };
 
   const resetChatState = useCallback(() => {
     setMessages(initialMessages);
@@ -201,6 +229,32 @@ function DirectChat({
           })}
           <div ref={messagesEndRef} />
         </div>
+
+        {/* 추천 질문들 표시 영역 */}
+        {showSuggestedQuestions && conversationTopics && conversationTopics.conversationTopics && (
+          <div className="suggested-questions-container">
+            <div className="suggested-questions-header">
+              <h4>💡 Suggested Questions</h4>
+              <button 
+                className="hide-suggestions-btn"
+                onClick={() => setShowSuggestedQuestions(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="suggested-questions-list">
+              {conversationTopics.conversationTopics.generalIceBreakers?.slice(0, 3).map((question, index) => (
+                <button
+                  key={index}
+                  className="suggested-question-card"
+                  onClick={() => handleSuggestedQuestionClick(question)}
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="direct-chat-input">
           <textarea
