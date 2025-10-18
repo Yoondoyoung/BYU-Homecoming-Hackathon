@@ -5,7 +5,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(136, 176, 75, 0.8);
+  background-color: transparent;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -84,7 +84,7 @@
 .vote-description {
   margin-top: 8px !important;
   font-size: 0.9rem !important;
-  color: #4a5d36 !important;
+  color: #2d3e1f !important;
   font-weight: 500;
 }
 
@@ -164,7 +164,7 @@
 .vote-label {
   font-size: 1.1rem;
   font-weight: 600;
-  color: #2d3e1f;
+  color: #2d3e1f !important;
 }
 
 .vote-progress {
@@ -197,7 +197,7 @@
 
 .vote-count {
   font-size: 0.9rem;
-  color: #4a5d36;
+  color: white;
   text-align: right;
 }
 
