@@ -11,6 +11,7 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
   const [hasVoted, setHasVoted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [hoursUntilMidnight, setHoursUntilMidnight] = useState(null);
 
   // Fetch vote data
   const fetchVoteData = async () => {
@@ -82,6 +83,12 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
       return;
     }
 
+    // Prevent voting if already voted today
+    if (hasVoted && hoursUntilMidnight) {
+      setError(`You have already voted today. Try again after midnight (in ${hoursUntilMidnight} hours).`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -119,8 +126,13 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
         const errorData = await response.json();
         console.error('❌ Vote failed:', errorData);
         
-        // Handle out of range error specifically
-        if (response.status === 403 && errorData.error === 'Out of range') {
+        // Handle already voted today error
+        if (response.status === 403 && errorData.error === 'Already voted today') {
+          setHasVoted(true);
+          setUserVote(errorData.existingVote);
+          setHoursUntilMidnight(errorData.hoursUntilMidnight);
+          setError(`🚫 ${errorData.message}`);
+        } else if (response.status === 403 && errorData.error === 'Out of range') {
           setError(`🚫 You are out of range! ${errorData.message}`);
         } else {
           setError(errorData.message || 'Failed to submit vote.');
@@ -151,6 +163,12 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
           <div className="vote-question">
             <p>Select your opinion about this building:</p>
             <p className="vote-description">A: Like / B: Dislike</p>
+            {hasVoted && userVote && (
+              <p className="vote-status" style={{ color: '#10b981', fontWeight: 'bold', marginTop: '10px' }}>
+                ✅ You voted today: {userVote.toUpperCase()}
+                {hoursUntilMidnight && ` (Next vote after midnight - ${hoursUntilMidnight}h)`}
+              </p>
+            )}
           </div>
 
           {error && (
@@ -170,7 +188,7 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
               <button 
                 className={`vote-button ${userVote === 'a' ? 'selected' : ''}`}
                 onClick={() => handleVote('a')}
-                disabled={loading || !userLocation}
+                disabled={loading || !userLocation || hasVoted}
               >
                 A
               </button>
@@ -192,7 +210,7 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
               <button 
                 className={`vote-button ${userVote === 'b' ? 'selected' : ''}`}
                 onClick={() => handleVote('b')}
-                disabled={loading || !userLocation}
+                disabled={loading || !userLocation || hasVoted}
               >
                 B
               </button>
@@ -213,6 +231,9 @@ const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
 
           <div className="vote-summary">
             <p>Total votes: {voteData.total}</p>
+            <p style={{ fontSize: '0.85em', color: '#666', marginTop: '10px' }}>
+              💡 You can vote once per building per day (resets at midnight)
+            </p>
           </div>
         </div>
       </div>
