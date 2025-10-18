@@ -23,6 +23,7 @@ function MainLayout() {
   const [directConversationId, setDirectConversationId] = useState(null);
   const [unreadDirectByUser, setUnreadDirectByUser] = useState({});
   const [preloadedMessages, setPreloadedMessages] = useState([]);
+  const [directConversationTopics, setDirectConversationTopics] = useState(null);
 
   useEffect(() => {
     // localStorage에서 사용자 정보 가져오기
@@ -156,7 +157,15 @@ function MainLayout() {
   };
 
   const openDirectChat = useCallback(
-    (partner, { initiator = false, conversationId, preloadMessages = [] } = {}) => {
+    (
+      partner,
+      {
+        initiator = false,
+        conversationId,
+        preloadMessages = [],
+        conversationTopics
+      } = {}
+    ) => {
       if (!partner || !user?.id || !socket) return;
       const finalConversationId = conversationId || computeConversationId(user.id, partner.id);
       if (!finalConversationId) return;
@@ -170,19 +179,36 @@ function MainLayout() {
       setIsDirectChatInitiator(initiator);
       setIsDirectChatOpen(true);
       setPreloadedMessages(normalizedPreload);
+      if (conversationTopics !== undefined) {
+        setDirectConversationTopics(conversationTopics);
+      }
       markConversationAsRead(partner.id);
     },
     [user?.id, socket, computeConversationId, markConversationAsRead]
   );
 
   const handleStartDirectChat = useCallback(
-    (partner) => {
+    (partner, options = {}) => {
       if (!partner) return;
       const unreadEntry = unreadDirectByUser[partner.id];
-      const preloadMessages = unreadEntry?.previewMessages || unreadEntry?.messages || [];
-      openDirectChat(partner, { initiator: true, preloadMessages });
+      const preloadMessages =
+        options.preloadMessages ??
+        unreadEntry?.previewMessages ??
+        unreadEntry?.messages ??
+        [];
+
+      const conversationTopics =
+        options.conversationTopics ??
+        directConversationTopics ??
+        undefined;
+
+      openDirectChat(partner, {
+        initiator: true,
+        preloadMessages,
+        conversationTopics
+      });
     },
-    [openDirectChat, unreadDirectByUser]
+    [openDirectChat, unreadDirectByUser, directConversationTopics]
   );
 
   const handleCloseDirectChat = useCallback(() => {
@@ -194,6 +220,7 @@ function MainLayout() {
     setDirectConversationId(null);
     setIsDirectChatInitiator(false);
     setPreloadedMessages([]);
+    setDirectConversationTopics(null);
   }, [directChatPartner, markConversationAsRead]);
 
   useEffect(() => {
@@ -444,6 +471,7 @@ function MainLayout() {
         isOpen={isDirectChatOpen}
         isInitiator={isDirectChatInitiator}
         onClose={handleCloseDirectChat}
+        conversationTopics={directConversationTopics}
       />
     </div>
   );

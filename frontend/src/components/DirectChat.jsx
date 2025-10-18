@@ -59,6 +59,7 @@ function DirectChat({
     setMessages(initialMessages);
     setMessage('');
     setParticipantCount(1);
+    setShowSuggestedQuestions(true);
   }, [initialMessages]);
 
   useEffect(() => {
