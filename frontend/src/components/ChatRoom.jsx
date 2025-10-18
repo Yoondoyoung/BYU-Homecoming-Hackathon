@@ -8,6 +8,7 @@ export default function ChatRoom() {
   const [nickname, setNickname] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  const [userCount, setUserCount] = useState(1);
   const messagesEndRef = useRef(null);
 
   // Get nickname from user profile on component mount
@@ -37,11 +38,21 @@ export default function ChatRoom() {
   }, [messages]);
 
   useEffect(() => {
-    socket.on("chatMessage", (data) => {
+    const handleChatMessage = (data) => {
       setMessages((prev) => [...prev, data]);
-    });
+    };
 
-    return () => socket.off("chatMessage");
+    const handleUserCountUpdate = (data) => {
+      setUserCount(data.userCount);
+    };
+
+    socket.on("chatMessage", handleChatMessage);
+    socket.on("userCountUpdate", handleUserCountUpdate);
+
+    return () => {
+      socket.off("chatMessage", handleChatMessage);
+      socket.off("userCountUpdate", handleUserCountUpdate);
+    };
   }, []);
 
 
@@ -61,7 +72,7 @@ export default function ChatRoom() {
     <div className="chat-container">
       <div className="chat-box">
         <div className="chat-header">
-          <h3>💬 BYU Chat Room</h3>
+          <h3>💬 BYU Chat Room ({userCount})</h3>
           <span className="user-info">Welcome, {nickname}!</span>
         </div>
         
