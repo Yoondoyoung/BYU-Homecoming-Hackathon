@@ -20,6 +20,7 @@ export default function MapBox() {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [spots, setSpots] = useState([]);
+  const [buildingVotes, setBuildingVotes] = useState({});
   const [locationPermission, setLocationPermission] = useState('unknown');
 
   // Distance calculation function (Haversine)
@@ -33,6 +34,46 @@ export default function MapBox() {
         Math.cos((lat2 * Math.PI) / 180) *
         Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  // Get building color based on vote results
+  const getBuildingColor = (buildingId) => {
+    const votes = buildingVotes[buildingId];
+    
+    if (!votes || votes.total === 0) {
+      // No votes yet - warm gray
+      return '#9CA3AF';
+    }
+
+    const optionA = votes.option_a || 0;
+    const optionB = votes.option_b || 0;
+
+    if (optionA === optionB) {
+      // Tie - warm gray
+      return '#9CA3AF';
+    } else if (optionA > optionB) {
+      // Option A winning - light blue
+      return '#60A5FA';
+    } else {
+      // Option B winning - coral orange
+      return '#FB923C';
+    }
+  };
+
+  // Fetch all building vote results
+  const fetchBuildingVotes = async () => {
+    try {
+      console.log("🗳️  Fetching building votes...");
+      const response = await fetch("http://localhost:4001/api/votes/all");
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log("✅ Building votes fetched:", data.buildingVotes);
+      setBuildingVotes(data.buildingVotes);
+    } catch (error) {
+      console.error("❌ Error fetching building votes:", error);
+    }
   };
 
   // Fetch spots data from API
@@ -59,6 +100,11 @@ export default function MapBox() {
     };
 
     fetchSpots();
+    fetchBuildingVotes();
+
+    // Refresh votes every 10 seconds
+    const interval = setInterval(fetchBuildingVotes, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   // Check location permission and get initial location on mount
@@ -178,7 +224,7 @@ export default function MapBox() {
     };
 
     safelyAddLayers();
-  }, [isMapLoaded, spots]);
+  }, [isMapLoaded, spots, buildingVotes]);
 
   // Join spot chat when user manually opens chat
   const joinSpotChat = (spot) => {
@@ -296,14 +342,20 @@ export default function MapBox() {
           id: s.id,
           name: s.name,
           owner: s.owner,
-          color: s.owner === "Love Mint Chocolate" ? "#10b981" : "#ef4444",
+          color: getBuildingColor(s.id),
         },
       })),
     };
 
     console.log("📍 Spot GeoJSON:", geojson);
 
-    // 기존 소스가 있으면 제거
+    // 기존 레이어와 소스가 있으면 제거
+    if (map.current.getLayer("spot-circles")) {
+      map.current.removeLayer("spot-circles");
+    }
+    if (map.current.getLayer("spot-symbols")) {
+      map.current.removeLayer("spot-symbols");
+    }
     if (map.current.getSource("spots")) {
       map.current.removeSource("spots");
     }
@@ -316,22 +368,49 @@ export default function MapBox() {
       return;
     }
 
+    // Add colored circle markers
+    map.current.addLayer({
+      id: "spot-circles",
+      type: "circle",
+      source: "spots",
+      paint: {
+        "circle-radius": 12,
+        "circle-color": ["get", "color"],
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#ffffff",
+        "circle-opacity": 0.9,
+      },
+    });
+
+    // Add text labels
     map.current.addLayer({
       id: "spot-symbols",
       type: "symbol",
       source: "spots",
       layout: {
-        "icon-image": "marker-15",
-        "icon-size": 1.3,
         "text-field": ["get", "name"],
         "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
-        "text-offset": [0, 1.2],
+        "text-offset": [0, 1.5],
         "text-anchor": "top",
+        "text-size": 12,
       },
-      paint: { "text-color": "#111" },
+      paint: { 
+        "text-color": "#111",
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 2,
+      },
     });
 
-    // Popup - 투표 컴포넌트로 변경
+    // Click handlers for both layers
+    map.current.on("click", "spot-circles", (e) => {
+      const f = e.features[0];
+      const { name, id } = f.properties;
+      setSelectedBuilding({
+        id: id,
+        name: name,
+      });
+    });
+
     map.current.on("click", "spot-symbols", (e) => {
       const f = e.features[0];
       const { name, id } = f.properties;
@@ -339,6 +418,14 @@ export default function MapBox() {
         id: id,
         name: name,
       });
+    });
+
+    // Hover cursor
+    map.current.on("mouseenter", "spot-circles", () => {
+      map.current.getCanvas().style.cursor = "pointer";
+    });
+    map.current.on("mouseleave", "spot-circles", () => {
+      map.current.getCanvas().style.cursor = "";
     });
   };
 
@@ -350,9 +437,22 @@ export default function MapBox() {
     }
 
     console.log("Adding radius polygons...");
-    const radiusFeatures = spots.map((s) =>
-      createCircle([s.lng, s.lat], s.radius)
-    );
+    const radiusFeatures = spots.map((s) => {
+      const circle = createCircle([s.lng, s.lat], s.radius);
+      circle.properties = {
+        buildingId: s.id,
+        color: getBuildingColor(s.id),
+      };
+      return circle;
+    });
+
+    // 기존 레이어와 소스가 있으면 제거
+    if (map.current.getLayer("spot-radius-fill")) {
+      map.current.removeLayer("spot-radius-fill");
+    }
+    if (map.current.getSource("spot-radius")) {
+      map.current.removeSource("spot-radius");
+    }
 
     map.current.addSource("spot-radius", {
       type: "geojson",
@@ -364,9 +464,8 @@ export default function MapBox() {
       type: "fill",
       source: "spot-radius",
       paint: {
-        "fill-color": "#3b82f6",
-        "fill-opacity": 0.1,
-        "fill-outline-color": "#3b82f6",
+        "fill-color": ["get", "color"],
+        "fill-opacity": 0.15,
       },
     });
   };
