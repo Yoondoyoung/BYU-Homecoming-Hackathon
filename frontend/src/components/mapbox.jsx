@@ -10,11 +10,10 @@ mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
 export default function MapBox() {
   const mapContainer = useRef(null);
   const map = useRef(null);
-  const userMarkerRef = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
   const [currentSpot, setCurrentSpot] = useState(null);
   const [socket, setSocket] = useState(null);
-  const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState("");
   const [showSpotChat, setShowSpotChat] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
@@ -38,16 +37,20 @@ export default function MapBox() {
   useEffect(() => {
     const fetchSpots = async () => {
       try {
-        console.log('🏢 Fetching spots from API...');
-        const response = await fetch('http://localhost:4001/api/buildings');
+        console.log("🏢 Fetching spots from API...");
+        const response = await fetch("http://localhost:4001/api/buildings");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const spotsData = await response.json();
-        console.log('✅ Spots fetched successfully:', spotsData.length, 'buildings');
+        console.log(
+          "✅ Spots fetched successfully:",
+          spotsData.length,
+          "buildings"
+        );
         setSpots(spotsData);
       } catch (error) {
-        console.error('❌ Error fetching spots:', error);
+        console.error("❌ Error fetching spots:", error);
         // Fallback to empty array if API fails
         setSpots([]);
       }
@@ -62,23 +65,23 @@ export default function MapBox() {
     setSocket(newSocket);
 
     // Get nickname from user profile
-    const userData = localStorage.getItem('user');
+    const userData = localStorage.getItem("user");
     if (userData) {
       try {
         const user = JSON.parse(userData);
-        const userNickname = user.nickname || user.name || 'Anonymous';
+        const userNickname = user.nickname || user.name || "Anonymous";
         setNickname(userNickname);
-        newSocket.emit('setNickname', userNickname);
+        newSocket.emit("setNickname", userNickname);
         console.log(`🎭 Using profile nickname: ${userNickname}`);
       } catch (error) {
-        console.error('Error parsing user data:', error);
-        setNickname('Anonymous');
-        newSocket.emit('setNickname', 'Anonymous');
+        console.error("Error parsing user data:", error);
+        setNickname("Anonymous");
+        newSocket.emit("setNickname", "Anonymous");
       }
     } else {
       // Fallback if no user data
-      setNickname('Anonymous');
-      newSocket.emit('setNickname', 'Anonymous');
+      setNickname("Anonymous");
+      newSocket.emit("setNickname", "Anonymous");
     }
 
     return () => newSocket.close();
@@ -86,24 +89,34 @@ export default function MapBox() {
 
   // Add map layers when both map and spots are loaded
   useEffect(() => {
-    if (isMapLoaded && spots.length > 0) {
-      console.log("🗺️ Adding map layers with", spots.length, "spots");
+    if (!isMapLoaded || spots.length === 0) return;
+
+    const safelyAddLayers = () => {
+      if (!map.current?.isStyleLoaded()) {
+        console.warn("⏳ Waiting for style...");
+        setTimeout(safelyAddLayers, 200);
+        return;
+      }
+
+      console.log("🗺️ Style is ready. Adding layers now...");
       try {
         addSpotLayers();
         addRadiusPolygons();
-        console.log("✅ Map layers added successfully");
+        console.log("✅ Layers added successfully");
       } catch (error) {
-        console.error("❌ Error adding map layers:", error);
+        console.error("❌ Error adding layers:", error);
       }
-    }
+    };
+
+    safelyAddLayers();
   }, [isMapLoaded, spots]);
 
   // Join spot chat when user manually opens chat
   const joinSpotChat = (spot) => {
     if (socket && nickname) {
-      socket.emit('joinSpotChat', {
+      socket.emit("joinSpotChat", {
         spotId: spot.id,
-        spotName: spot.name
+        spotName: spot.name,
       });
       setShowSpotChat(true);
       console.log(`📍 Joined ${spot.name} chat room`);
@@ -113,7 +126,7 @@ export default function MapBox() {
   // Leave spot chat when exiting a spot
   const leaveSpotChat = () => {
     if (socket && currentSpot) {
-      socket.emit('leaveSpotChat');
+      socket.emit("leaveSpotChat");
       setCurrentSpot(null);
       setShowSpotChat(false);
       console.log(`📍 Left ${currentSpot.name} chat room`);
@@ -158,7 +171,7 @@ export default function MapBox() {
     });
 
     map.current.addControl(new mapboxgl.NavigationControl());
-    
+
     // Add geolocate control with custom styling
     const geolocate = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
@@ -166,7 +179,7 @@ export default function MapBox() {
       showUserHeading: true,
       showAccuracyCircle: false, // We'll create our own pulse effect
     });
-    
+
     map.current.addControl(geolocate);
 
     map.current.on("load", () => {
@@ -197,7 +210,7 @@ export default function MapBox() {
       console.warn("Map not initialized yet, skipping spot layers");
       return;
     }
-    
+
     console.log("Adding spot layers...", spots.length, "spots found");
     const geojson = {
       type: "FeatureCollection",
@@ -212,10 +225,21 @@ export default function MapBox() {
         },
       })),
     };
-    
+
     console.log("📍 Spot GeoJSON:", geojson);
 
-    map.current.addSource("spots", { type: "geojson", data: geojson });
+    // 기존 소스가 있으면 제거
+    if (map.current.getSource("spots")) {
+      map.current.removeSource("spots");
+    }
+
+    // 새 소스 추가
+    try {
+      map.current.addSource("spots", { type: "geojson", data: geojson });
+    } catch (error) {
+      console.error("Error adding spots source:", error);
+      return;
+    }
 
     map.current.addLayer({
       id: "spot-symbols",
@@ -238,7 +262,7 @@ export default function MapBox() {
       const { name, id } = f.properties;
       setSelectedBuilding({
         id: id,
-        name: name
+        name: name,
       });
     });
   };
@@ -249,7 +273,7 @@ export default function MapBox() {
       console.warn("Map not initialized yet, skipping radius polygons");
       return;
     }
-    
+
     console.log("Adding radius polygons...");
     const radiusFeatures = spots.map((s) =>
       createCircle([s.lng, s.lat], s.radius)
@@ -275,80 +299,87 @@ export default function MapBox() {
   // Update user location using MapBox's built-in user location (most stable)
   useEffect(() => {
     if (!map.current || !userLocation) return;
-    
+
     console.log("🗺️ Updating user location on map:", userLocation);
 
     // Remove existing custom user location source and layers
-    if (map.current.getSource('user-location')) {
-      map.current.removeLayer('user-location-pulse');
-      map.current.removeLayer('user-location-dot');
-      map.current.removeSource('user-location');
+    if (map.current.getSource("user-location")) {
+      map.current.removeLayer("user-location-pulse");
+      map.current.removeLayer("user-location-dot");
+      map.current.removeSource("user-location");
     }
 
     // Create GeoJSON data for user location
     const userLocationGeoJSON = {
-      type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [userLocation.lng, userLocation.lat]
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [userLocation.lng, userLocation.lat],
+          },
+          properties: {
+            id: "user-location",
+          },
         },
-        properties: {
-          id: 'user-location'
-        }
-      }]
+      ],
     };
 
     // Add user location source
-    map.current.addSource('user-location', {
-      type: 'geojson',
-      data: userLocationGeoJSON
+    map.current.addSource("user-location", {
+      type: "geojson",
+      data: userLocationGeoJSON,
     });
 
     // Add pulse ring layer (scales with zoom)
     map.current.addLayer({
-      id: 'user-location-pulse',
-      type: 'circle',
-      source: 'user-location',
+      id: "user-location-pulse",
+      type: "circle",
+      source: "user-location",
       paint: {
-        'circle-radius': {
-          'base': 1.75,
-          'stops': [[12, 15], [22, 120]]
+        "circle-radius": {
+          base: 1.75,
+          stops: [
+            [12, 15],
+            [22, 120],
+          ],
         },
-        'circle-color': '#2563eb',
-        'circle-opacity': 0.2,
-        'circle-stroke-width': 2,
-        'circle-stroke-color': '#2563eb',
-        'circle-stroke-opacity': 0.4
-      }
+        "circle-color": "#2563eb",
+        "circle-opacity": 0.2,
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#2563eb",
+        "circle-stroke-opacity": 0.4,
+      },
     });
 
     // Add center dot layer (scales with zoom)
     map.current.addLayer({
-      id: 'user-location-dot',
-      type: 'circle',
-      source: 'user-location',
+      id: "user-location-dot",
+      type: "circle",
+      source: "user-location",
       paint: {
-        'circle-radius': {
-          'base': 1.75,
-          'stops': [[12, 6], [22, 10]]
+        "circle-radius": {
+          base: 1.75,
+          stops: [
+            [12, 6],
+            [22, 10],
+          ],
         },
-        'circle-color': '#2563eb',
-        'circle-stroke-width': 3,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-opacity': 1
-      }
+        "circle-color": "#2563eb",
+        "circle-stroke-width": 3,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-opacity": 1,
+      },
     });
-
   }, [userLocation]);
 
   // Spot entry detection with automatic chat joining
   useEffect(() => {
     if (!userLocation || !socket) return;
-    
+
     let enteredSpot = null;
-    
+
     spots.forEach((spot) => {
       const dist = getDistance(
         userLocation.lat,
@@ -356,19 +387,21 @@ export default function MapBox() {
         spot.lat,
         spot.lng
       );
-      
+
       if (dist < spot.radius) {
         enteredSpot = spot;
-        console.log(`✅ ${spot.name} entry detected (distance: ${dist.toFixed(1)}m)`);
+        console.log(
+          `✅ ${spot.name} entry detected (distance: ${dist.toFixed(1)}m)`
+        );
       }
     });
-    
+
     // Update current spot without auto-opening chat
     if (enteredSpot && (!currentSpot || currentSpot.id !== enteredSpot.id)) {
       setCurrentSpot(enteredSpot);
       console.log(`📍 Entered ${enteredSpot.name} - Chat available`);
     }
-    
+
     // Auto-leave spot chat if not in any spot
     if (!enteredSpot && currentSpot) {
       leaveSpotChat();
@@ -386,7 +419,7 @@ export default function MapBox() {
         </div>
       )}
       <div ref={mapContainer} className="map-container-inner" />
-      
+
       {/* Spot Chat Overlay */}
       {showSpotChat && currentSpot && (
         <SpotChat
@@ -396,7 +429,7 @@ export default function MapBox() {
           onClose={closeSpotChat}
         />
       )}
-      
+
       {/* Current Spot Indicator */}
       {currentSpot && (
         <div className="current-spot-indicator">
@@ -405,7 +438,7 @@ export default function MapBox() {
             <span className="spot-indicator-text">
               You're at {currentSpot.name}
             </span>
-            <button 
+            <button
               className="spot-chat-toggle"
               onClick={() => {
                 if (!showSpotChat) {
