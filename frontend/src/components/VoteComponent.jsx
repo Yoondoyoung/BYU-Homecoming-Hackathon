@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/VoteComponent.css';
 
-const VoteComponent = ({ buildingId, buildingName, onClose }) => {
+const VoteComponent = ({ buildingId, buildingName, userLocation, onClose }) => {
   const [voteData, setVoteData] = useState({
     option_a: 0,
     option_b: 0,
@@ -12,7 +12,7 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 투표 데이터 가져오기
+  // Fetch vote data
   const fetchVoteData = async () => {
     try {
       const token = localStorage.getItem('access_token');
@@ -24,7 +24,7 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // 건물별 투표 결과 조회
+      // Fetch building vote results
       const voteResponse = await fetch(`http://localhost:4001/api/votes/building/${buildingId}`, {
         headers
       });
@@ -34,7 +34,7 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
         setVoteData(voteResult.votes);
       }
 
-      // 사용자 투표 조회 (로그인한 경우만)
+      // Fetch user vote (only if logged in)
       if (token) {
         const userVoteResponse = await fetch(`http://localhost:4001/api/votes/user/${buildingId}`, {
           headers
@@ -48,11 +48,11 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
       }
     } catch (err) {
       console.error('Error fetching vote data:', err);
-      setError('투표 데이터를 가져오는데 실패했습니다.');
+      setError('Failed to fetch vote data.');
     }
   };
 
-  // 실시간 투표 데이터 업데이트 (5초마다)
+  // Real-time vote data update (every 5 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchVoteData();
@@ -65,14 +65,20 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
     fetchVoteData();
   }, [buildingId]);
 
-  // 투표하기
+  // Submit vote
   const handleVote = async (voteOption) => {
     const token = localStorage.getItem('access_token');
     console.log('🗳️  Attempting to vote:', { buildingId, voteOption, hasToken: !!token });
     
     if (!token) {
       console.error('❌ No access token found');
-      setError('투표하려면 로그인이 필요합니다.');
+      setError('You must be logged in to vote.');
+      return;
+    }
+
+    // Check if location is available
+    if (!userLocation) {
+      setError('Location not available. Please wait for GPS to load.');
       return;
     }
 
@@ -89,7 +95,9 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
         },
         body: JSON.stringify({
           buildingId: buildingId,
-          voteOption: voteOption
+          voteOption: voteOption,
+          userLatitude: userLocation.lat,
+          userLongitude: userLocation.lng
         })
       });
 
@@ -100,16 +108,27 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
         console.log('✅ Vote successful:', result);
         setUserVote(voteOption);
         setHasVoted(true);
-        // 투표 데이터 다시 가져오기
+        // Fetch updated vote data
         await fetchVoteData();
+        
+        // Display distance information
+        if (result.distance) {
+          console.log(`📏 You are ${result.distance}m away from the building`);
+        }
       } else {
         const errorData = await response.json();
         console.error('❌ Vote failed:', errorData);
-        setError(errorData.message || '투표에 실패했습니다.');
+        
+        // Handle out of range error specifically
+        if (response.status === 403 && errorData.error === 'Out of range') {
+          setError(`🚫 You are out of range! ${errorData.message}`);
+        } else {
+          setError(errorData.message || 'Failed to submit vote.');
+        }
       }
     } catch (err) {
       console.error('❌ Error voting:', err);
-      setError('투표 처리 중 오류가 발생했습니다.');
+      setError('An error occurred while processing vote.');
     } finally {
       setLoading(false);
     }
@@ -130,8 +149,8 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
         
         <div className="vote-content">
           <div className="vote-question">
-            <p>이 건물에 대한 의견을 선택해주세요:</p>
-            <p className="vote-description">A: 좋아요 / B: 싫어요</p>
+            <p>Select your opinion about this building:</p>
+            <p className="vote-description">A: Like / B: Dislike</p>
           </div>
 
           {error && (
@@ -140,17 +159,23 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
             </div>
           )}
 
+          {!userLocation && (
+            <div className="info-message" style={{ textAlign: 'center', padding: '10px', color: '#666' }}>
+              📍 Getting your location...
+            </div>
+          )}
+
           <div className="vote-options">
             <div className="vote-option">
               <button 
                 className={`vote-button ${userVote === 'a' ? 'selected' : ''}`}
                 onClick={() => handleVote('a')}
-                disabled={loading}
+                disabled={loading || !userLocation}
               >
                 A
               </button>
               <div className="vote-info">
-                <span className="vote-label">좋아요</span>
+                <span className="vote-label">Like</span>
                 <div className="vote-progress">
                   <div className="progress-bar">
                     <div 
@@ -158,7 +183,7 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
                       style={{ width: `${getPercentage(voteData.option_a)}%` }}
                     ></div>
                   </div>
-                  <span className="vote-count">{voteData.option_a}표 ({getPercentage(voteData.option_a)}%)</span>
+                  <span className="vote-count">{voteData.option_a} votes ({getPercentage(voteData.option_a)}%)</span>
                 </div>
               </div>
             </div>
@@ -167,12 +192,12 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
               <button 
                 className={`vote-button ${userVote === 'b' ? 'selected' : ''}`}
                 onClick={() => handleVote('b')}
-                disabled={loading}
+                disabled={loading || !userLocation}
               >
                 B
               </button>
               <div className="vote-info">
-                <span className="vote-label">싫어요</span>
+                <span className="vote-label">Dislike</span>
                 <div className="vote-progress">
                   <div className="progress-bar">
                     <div 
@@ -180,14 +205,14 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
                       style={{ width: `${getPercentage(voteData.option_b)}%` }}
                     ></div>
                   </div>
-                  <span className="vote-count">{voteData.option_b}표 ({getPercentage(voteData.option_b)}%)</span>
+                  <span className="vote-count">{voteData.option_b} votes ({getPercentage(voteData.option_b)}%)</span>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="vote-summary">
-            <p>총 투표수: {voteData.total}표</p>
+            <p>Total votes: {voteData.total}</p>
           </div>
         </div>
       </div>
