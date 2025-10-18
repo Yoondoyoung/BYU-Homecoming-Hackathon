@@ -46,7 +46,7 @@ function CommonHeader({ currentPage, onPageChange, user }) {
       <div className="header-content">
         <div className="header-left">
           <div className="header-text">
-            <h1>BYU Homecoming Hackathon</h1>
+            <h1>Perfect Pear</h1>
             <p>Interactive Platform</p>
           </div>
         </div>
@@ -69,7 +69,7 @@ function CommonHeader({ currentPage, onPageChange, user }) {
               className={`page-button ${currentPage === 'leaderboard' ? 'active' : ''}`}
               onClick={() => onPageChange('leaderboard')}
             >
-              🏆 Leaderboard
+              Leaderboard
             </button>
           </div>
         </div>

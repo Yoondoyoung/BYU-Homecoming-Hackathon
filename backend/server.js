@@ -2,7 +2,12 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-require('dotenv').config();
+const path = require('path');
+
+// Ensure we always load the backend/.env file regardless of where the server is started from
+require('dotenv').config({
+  path: path.resolve(__dirname, '.env')
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -13,6 +18,58 @@ const io = new Server(server, {
     credentials: true
   }
 });
+
+// Track online sockets per user for direct chat notifications
+const userSocketMap = new Map();
+
+const getUserKey = (userId) => {
+  if (!userId && userId !== 0) return null;
+  return String(userId);
+};
+
+const addUserSocket = (userId, socket) => {
+  const key = getUserKey(userId);
+  if (!key) return;
+
+  let socketSet = userSocketMap.get(key);
+  if (!socketSet) {
+    socketSet = new Set();
+    userSocketMap.set(key, socketSet);
+  }
+  socketSet.add(socket.id);
+  socket.data.userId = key;
+};
+
+const removeUserSocket = (socket) => {
+  const key = getUserKey(socket?.data?.userId);
+  if (!key) return;
+
+  const socketSet = userSocketMap.get(key);
+  if (!socketSet) return;
+
+  socketSet.delete(socket.id);
+  if (socketSet.size === 0) {
+    userSocketMap.delete(key);
+  }
+};
+
+const emitToUser = (userId, eventName, payload, excludeSocketId = null) => {
+  const key = getUserKey(userId);
+  if (!key) return;
+
+  const socketIds = userSocketMap.get(key);
+  if (!socketIds) return;
+
+  socketIds.forEach((id) => {
+    if (excludeSocketId && id === excludeSocketId) {
+      return;
+    }
+    const targetSocket = io.sockets.sockets.get(id);
+    if (targetSocket) {
+      targetSocket.emit(eventName, payload);
+    }
+  });
+};
 
 const PORT = process.env.PORT || 4001;
 
@@ -372,10 +429,40 @@ app.use((req, res) => {
 io.on('connection', (socket) => {
   console.log(`✅ User connected: ${socket.id}`);
 
+  const getDirectRoomName = (conversationId) => {
+    if (conversationId === null || conversationId === undefined) return null;
+    return `direct-${String(conversationId)}`;
+  };
+
+  const ensureDirectChatStore = () => {
+    if (!socket.data.directChats) {
+      socket.data.directChats = new Set();
+    }
+  };
   // User nickname registration
-  socket.on('setNickname', (nickname) => {
+  socket.on('setNickname', (payload) => {
+    let nickname = 'Anonymous';
+    let userId = null;
+
+    if (payload && typeof payload === 'object') {
+      nickname = payload.nickname || payload.name || payload.displayName || nickname;
+      userId = payload.userId || payload.id || null;
+    } else if (typeof payload === 'string') {
+      nickname = payload || nickname;
+    }
+
+    nickname = nickname?.toString().trim() || 'Anonymous';
     socket.data.nickname = nickname;
-    console.log(`🎭 ${socket.id} nickname: ${nickname}`);
+
+    if (userId) {
+      removeUserSocket(socket);
+      addUserSocket(userId, socket);
+    } else if (socket.data.userId && (!payload || typeof payload !== 'object')) {
+      removeUserSocket(socket);
+      socket.data.userId = null;
+    }
+
+    console.log(`🎭 ${socket.id} nickname: ${nickname}${userId ? ` (userId: ${userId})` : ''}`);
     
     // Join general chat room
     socket.join('general-chat');
@@ -477,6 +564,150 @@ io.on('connection', (socket) => {
     console.log(`💬 [Spot ${currentSpot}] ${user}: ${msg}`);
   });
 
+  // Direct chat: join conversation
+  socket.on('joinDirectChat', (payload = {}) => {
+    const { conversationId, participants = {}, notifyPartner = true, metadata = {} } = payload;
+    const roomName = getDirectRoomName(conversationId);
+
+    if (!roomName) {
+      socket.emit('directError', { message: 'Invalid conversation id.' });
+      return;
+    }
+
+    socket.join(roomName);
+    ensureDirectChatStore();
+    socket.data.directChats.add(roomName);
+
+    if (participants.fromUserId) {
+      removeUserSocket(socket);
+      socket.data.userId = participants.fromUserId;
+      addUserSocket(participants.fromUserId, socket);
+    }
+
+    const nickname = participants.fromNickname || socket.data.nickname || 'Anonymous';
+    const timestamp = new Date().toLocaleTimeString();
+    const roomSize = io.sockets.adapter.rooms.get(roomName)?.size || 0;
+
+    io.to(roomName).emit('directMessage', {
+      conversationId,
+      senderId: 'system',
+      senderNickname: 'System',
+      message: `${nickname} joined the chat.`,
+      time: timestamp,
+      type: 'system'
+    });
+
+    io.to(roomName).emit('directUserCountUpdate', {
+      conversationId,
+      userCount: roomSize
+    });
+
+    if (notifyPartner && participants.toUserId && participants.fromUserId !== participants.toUserId) {
+      const invitePayload = {
+        conversationId,
+        fromUser: {
+          id: participants.fromUserId,
+          nickname: nickname,
+          profile_image_url: participants.fromProfileImage || null,
+          major: participants.fromMajor || null,
+          hobby: participants.fromHobby || null
+        },
+        toUserId: participants.toUserId,
+        createdAt: new Date().toISOString(),
+        metadata
+      };
+
+      emitToUser(participants.toUserId, 'directChatInvite', invitePayload, socket.id);
+    }
+  });
+
+  // Direct chat: leave conversation
+  socket.on('leaveDirectChat', (payload = {}) => {
+    const { conversationId } = payload;
+    const roomName = getDirectRoomName(conversationId);
+
+    if (!roomName || !socket.data.directChats || !socket.data.directChats.has(roomName)) {
+      return;
+    }
+
+    socket.leave(roomName);
+    socket.data.directChats.delete(roomName);
+
+    const nickname = socket.data.nickname || 'Anonymous';
+    const timestamp = new Date().toLocaleTimeString();
+    const roomSize = io.sockets.adapter.rooms.get(roomName)?.size || 0;
+
+    io.to(roomName).emit('directMessage', {
+      conversationId,
+      senderId: 'system',
+      senderNickname: 'System',
+      message: `${nickname} left the chat.`,
+      time: timestamp,
+      type: 'system'
+    });
+
+    io.to(roomName).emit('directUserCountUpdate', {
+      conversationId,
+      userCount: roomSize
+    });
+  });
+
+  // Direct chat: send message
+  socket.on('sendDirectMessage', (payload = {}) => {
+    const { conversationId, message, senderId, senderNickname, recipientId, senderProfileImage } = payload;
+    const roomName = getDirectRoomName(conversationId);
+
+    if (!roomName) {
+      socket.emit('directError', { message: 'Invalid conversation id.' });
+      return;
+    }
+
+    if (!socket.data.directChats || !socket.data.directChats.has(roomName)) {
+      socket.emit('directError', { message: 'You are not in this conversation.' });
+      return;
+    }
+
+    if (typeof message !== 'string' || message.trim() === '') {
+      return;
+    }
+
+    const preparedMessage = {
+      conversationId,
+      senderId: senderId || socket.data.userId || socket.id,
+      senderNickname: senderNickname || socket.data.nickname || 'Anonymous',
+      message: message.trim(),
+      time: new Date().toLocaleTimeString(),
+      type: 'user'
+    };
+
+    io.to(roomName).emit('directMessage', preparedMessage);
+    console.log(`💬 [Direct ${conversationId}] ${preparedMessage.senderNickname}: ${preparedMessage.message}`);
+
+    const notificationPayload = {
+      conversationId,
+      fromUser: {
+        id: preparedMessage.senderId,
+        nickname: preparedMessage.senderNickname,
+        profile_image_url: senderProfileImage || null
+      },
+      message: preparedMessage.message,
+      time: preparedMessage.time,
+      type: 'user'
+    };
+
+    if (recipientId) {
+      emitToUser(recipientId, 'directMessageNotification', notificationPayload);
+    }
+
+    if (preparedMessage.senderId) {
+      emitToUser(preparedMessage.senderId, 'directMessageNotification', {
+        ...notificationPayload,
+        toUserId: recipientId || null,
+        isSelf: true
+      }, socket.id);
+    }
+  });
+
   // Disconnect
   socket.on('disconnect', () => {
     const nickname = socket.data.nickname;
@@ -510,6 +741,34 @@ io.on('connection', (socket) => {
         });
       }
     }
+
+    if (socket.data.directChats && socket.data.directChats.size > 0) {
+      const nicknameForDirect = nickname || 'Anonymous';
+
+      for (const roomName of socket.data.directChats) {
+        socket.leave(roomName);
+        const conversationId = roomName.replace(/^direct-/, '');
+        const roomSize = io.sockets.adapter.rooms.get(roomName)?.size || 0;
+
+        io.to(roomName).emit('directMessage', {
+          conversationId,
+          senderId: 'system',
+          senderNickname: 'System',
+          message: `${nicknameForDirect} disconnected.`,
+          time: new Date().toLocaleTimeString(),
+          type: 'system'
+        });
+
+        io.to(roomName).emit('directUserCountUpdate', {
+          conversationId,
+          userCount: roomSize
+        });
+      }
+
+      socket.data.directChats.clear();
+    }
+
+    removeUserSocket(socket);
   });
 });
 
