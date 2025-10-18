@@ -37,6 +37,9 @@ function HomePage() {
           <Link to="/map" className="nav-button">
             View Interactive Map
           </Link>
+          <Link to="/chat" className="nav-button">
+            💬 Join Chat Room
+          </Link>
         </div>
         
         <div className="health-check">
