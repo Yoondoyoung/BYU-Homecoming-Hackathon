@@ -9,20 +9,78 @@
   background-color: #282c34;
   color: white;
   padding: 20px;
-  text-align: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.map-header h1 {
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header-text {
+  text-align: left;
+}
+
+.header-text h1 {
   margin: 0 0 10px 0;
   font-size: 2rem;
   color: #61dafb;
 }
 
-.map-header p {
+.header-text p {
   margin: 0;
   font-size: 1rem;
   opacity: 0.9;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.welcome-text {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.nickname {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #61dafb;
+  background: rgba(97, 218, 251, 0.1);
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(97, 218, 251, 0.3);
+}
+
+.logout-button {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-button:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
 }
 
 .map-content {
@@ -30,6 +88,34 @@
   padding: 20px;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.coming-soon {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 500px;
+  width: 100%;
+}
+
+.coming-soon h2 {
+  color: #333;
+  font-size: 2rem;
+  margin: 0 0 15px 0;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.coming-soon p {
+  color: #666;
+  font-size: 1.1rem;
+  margin: 0;
 }
 
 .map-content .map-wrapper {
