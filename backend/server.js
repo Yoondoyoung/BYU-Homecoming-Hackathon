@@ -37,6 +37,112 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// User Profile API endpoints
+app.get('/api/user/profile', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Error in user profile endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.put('/api/user/profile', async (req, res) => {
+  try {
+    console.log('🔍 Profile update request received:', {
+      headers: req.headers,
+      body: req.body
+    });
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ No authorization token provided');
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    console.log('🔑 Token extracted, validating with Supabase...');
+    
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.log('❌ Invalid token:', authError);
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    console.log('✅ User authenticated:', { id: user.id, email: user.email });
+
+    const { nickname, major, hobby, gender, classes, favorite_foods, bio, profile_image_url } = req.body;
+    
+    console.log('📝 Profile data to update:', {
+      nickname,
+      major,
+      hobby,
+      gender,
+      classes,
+      favorite_foods,
+      bio,
+      profile_image_url
+    });
+
+    const updateData = {
+      nickname,
+      major,
+      hobby,
+      gender,
+      classes,
+      favorite_foods,
+      bio,
+      profile_image_url,
+      is_profile_complete: true,
+      updated_at: new Date().toISOString()
+    };
+
+    console.log('💾 Updating database with data:', updateData);
+
+    const { data, error } = await supabase
+      .from('users')
+      .update(updateData)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Error updating user profile:', error);
+      return res.status(500).json({ error: 'Failed to update user profile', details: error.message });
+    }
+
+    console.log('✅ Profile updated successfully:', data);
+    res.json(data);
+  } catch (error) {
+    console.error('❌ Error in user profile update endpoint:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
 // Buildings API endpoint
 app.get('/api/buildings', async (req, res) => {
   try {

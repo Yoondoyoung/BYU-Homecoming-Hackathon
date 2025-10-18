@@ -1,209 +1,288 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/ProfilePage.css';
 
-function ProfilePage() {
+const ProfilePage = ({ onUserUpdate }) => {
   const [user, setUser] = useState(null);
-  const [formData, setFormData] = useState({
-    nickname: ''
+  const [profile, setProfile] = useState({
+    nickname: '',
+    major: '',
+    hobby: [],
+    gender: '',
+    classes: [],
+    favorite_foods: [],
+    bio: '',
+    profile_image_url: ''
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    // localStorage에서 사용자 정보 가져오기
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        setFormData({
-          nickname: parsedUser.nickname || ''
-        });
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
+    fetchUserProfile();
   }, []);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSave = async () => {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
+  const fetchUserProfile = async () => {
     try {
+      // localStorage에서 토큰 가져오기
       const token = localStorage.getItem('access_token');
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      let response = await fetch('http://localhost:4001/api/auth/profile', {
-        method: 'PUT',
+      if (!token) {
+        console.error('No access token found');
+        setLoading(false);
+        return;
+      }
+
+      // Fetch user profile from our API
+      const response = await fetch('http://localhost:4001/api/user/profile', {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nickname: formData.nickname
-        }),
+          'Content-Type': 'application/json'
+        }
       });
 
-      // 토큰 만료 시 자동 갱신 시도
-      if (response.status === 401) {
-        console.log('Token expired, attempting refresh...');
-        const refreshResponse = await fetch('http://localhost:4001/api/auth/refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            refresh_token: refreshToken
-          }),
-        });
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
-          localStorage.setItem('access_token', refreshData.access_token);
-          localStorage.setItem('refresh_token', refreshData.refresh_token);
-          
-          // 새로운 토큰으로 다시 시도
-          response = await fetch('http://localhost:4001/api/auth/profile', {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${refreshData.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              nickname: formData.nickname
-            }),
-          });
-        } else {
-          // 리프레시 실패 시 로그인 페이지로 리다이렉트
-          localStorage.clear();
-          window.location.href = '/login';
-          return;
-        }
-      }
-
-      const data = await response.json();
-
       if (response.ok) {
-        setSuccess('Profile updated successfully!');
-        // localStorage 업데이트
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setUser(data.user);
+        const profileData = await response.json();
+        setProfile({
+          nickname: profileData.nickname || '',
+          major: profileData.major || '',
+          hobby: profileData.hobby || [],
+          gender: profileData.gender || '',
+          classes: profileData.classes || [],
+          favorite_foods: profileData.favorite_foods || [],
+          bio: profileData.bio || '',
+          profile_image_url: profileData.profile_image_url || ''
+        });
+        setUser(profileData);
       } else {
-        console.error('Profile update failed:', data);
-        setError(data.message || data.error || 'Failed to update profile.');
+        console.error('Failed to fetch profile');
       }
     } catch (error) {
-      console.error('Profile update error:', error);
-      setError('Failed to connect to server. Please try again.');
+      console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+  const handleInputChange = (field, value) => {
+    setProfile(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  if (!user) {
-    return <div>Loading...</div>;
+  const handleArrayInputChange = (field, value) => {
+    const array = value.split(',').map(item => item.trim()).filter(item => item);
+    setProfile(prev => ({
+      ...prev,
+      [field]: array
+    }));
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      // localStorage에서 토큰 가져오기
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setMessage('No access token found');
+        return;
+      }
+
+      const response = await fetch('http://localhost:4001/api/user/profile', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(profile)
+      });
+
+      if (response.ok) {
+        const updatedProfile = await response.json();
+        
+        // localStorage의 user 데이터 업데이트
+        const currentUserData = localStorage.getItem('user');
+        if (currentUserData) {
+          try {
+            const userData = JSON.parse(currentUserData);
+            const updatedUserData = {
+              ...userData,
+              nickname: updatedProfile.nickname,
+              major: updatedProfile.major,
+              hobby: updatedProfile.hobby,
+              gender: updatedProfile.gender,
+              classes: updatedProfile.classes,
+              favorite_foods: updatedProfile.favorite_foods,
+              bio: updatedProfile.bio,
+              profile_image_url: updatedProfile.profile_image_url
+            };
+            localStorage.setItem('user', JSON.stringify(updatedUserData));
+            
+            // CommonHeader 업데이트를 위한 콜백 호출
+            if (onUserUpdate) {
+              onUserUpdate();
+            }
+          } catch (error) {
+            console.error('Error updating localStorage:', error);
+          }
+        }
+        
+        setMessage('Profile updated successfully!');
+        setTimeout(() => setMessage(''), 3000);
+      } else {
+        const error = await response.json();
+        setMessage(`Error: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setMessage('Error saving profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="profile-page">
+        <div className="loading">Loading profile...</div>
+      </div>
+    );
   }
+
   return (
     <div className="profile-page">
       <div className="profile-content">
         <div className="profile-header">
           <h2>Profile Settings</h2>
-          <p>Manage your account information and preferences</p>
+          <p>Manage your profile information and preferences</p>
         </div>
         
+        {message && (
+          <div className={`${message.includes('Error') ? 'error-message' : 'success-message'}`}>
+            {message}
+          </div>
+        )}
+
         <div className="profile-sections">
           <div className="profile-section">
-            <h3>Profile Picture</h3>
-            <div className="profile-picture-section">
-              <div className="current-picture">
-                <div className="avatar-large">
-                  {user.profile_image ? (
-                    <img src={user.profile_image} alt="Profile" />
-                  ) : (
-                    <div className="avatar-initials-large">
-                      {getInitials(user.name || user.nickname)}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="picture-actions">
-                <button className="upload-button">Upload Photo</button>
-                <button className="remove-button">Remove Photo</button>
-              </div>
-            </div>
-          </div>
-          
-          <div className="profile-section">
-            <h3>Personal Information</h3>
+            <h3>Basic Information</h3>
             <div className="info-form">
               <div className="form-group">
-                <label>Full Name</label>
-                <input type="text" placeholder="Enter your full name" defaultValue={user.name || ''} disabled />
-              </div>
-              <div className="form-group">
-                <label>Nickname</label>
-                <input 
-                  type="text" 
-                  name="nickname"
-                  placeholder="Enter your nickname" 
-                  value={formData.nickname}
-                  onChange={handleChange}
+                <label htmlFor="nickname">Nickname *</label>
+                <input
+                  type="text"
+                  id="nickname"
+                  value={profile.nickname}
+                  onChange={(e) => handleInputChange('nickname', e.target.value)}
+                  placeholder="Enter your nickname"
+                  required
                 />
               </div>
+
               <div className="form-group">
-                <label>Email</label>
-                <input type="email" placeholder="Enter your email" defaultValue={user.email || ''} disabled />
+                <label htmlFor="major">Major</label>
+                <input
+                  type="text"
+                  id="major"
+                  value={profile.major}
+                  onChange={(e) => handleInputChange('major', e.target.value)}
+                  placeholder="e.g., Computer Science, Business"
+                />
               </div>
+
               <div className="form-group">
-                <label>School</label>
-                <select disabled>
-                  <option value={user.school || ''}>
-                    {user.school === 'byu' ? 'Brigham Young University (Provo)' :
-                     user.school === 'byuh' ? 'Brigham Young University Hawaii' :
-                     user.school === 'byui' ? 'Brigham Young University Idaho' :
-                     'Select your school'}
-                  </option>
+                <label htmlFor="gender">Gender</label>
+                <select
+                  id="gender"
+                  value={profile.gender}
+                  onChange={(e) => handleInputChange('gender', e.target.value)}
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
                 </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="profile_image_url">Profile Image URL</label>
+                <input
+                  type="url"
+                  id="profile_image_url"
+                  value={profile.profile_image_url}
+                  onChange={(e) => handleInputChange('profile_image_url', e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                />
               </div>
             </div>
           </div>
-          
+
           <div className="profile-section">
-            <h3>Skills & Interests</h3>
-            <div className="skills-section">
-              <p>Coming soon: Add your skills and interests for better matching!</p>
+            <h3>Interests & Activities</h3>
+            <div className="info-form">
+              <div className="form-group">
+                <label htmlFor="hobby">Hobbies</label>
+                <input
+                  type="text"
+                  id="hobby"
+                  value={profile.hobby.join(', ')}
+                  onChange={(e) => handleArrayInputChange('hobby', e.target.value)}
+                  placeholder="e.g., Reading, Gaming, Sports (comma separated)"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="classes">Current Classes</label>
+                <input
+                  type="text"
+                  id="classes"
+                  value={profile.classes.join(', ')}
+                  onChange={(e) => handleArrayInputChange('classes', e.target.value)}
+                  placeholder="e.g., CS 240, MATH 112, ECON 110 (comma separated)"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="favorite_foods">Favorite Foods</label>
+                <input
+                  type="text"
+                  id="favorite_foods"
+                  value={profile.favorite_foods.join(', ')}
+                  onChange={(e) => handleArrayInputChange('favorite_foods', e.target.value)}
+                  placeholder="e.g., Pizza, Sushi, Tacos (comma separated)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="profile-section">
+            <h3>About Me</h3>
+            <div className="form-group">
+              <label htmlFor="bio">Bio</label>
+              <textarea
+                id="bio"
+                value={profile.bio}
+                onChange={(e) => handleInputChange('bio', e.target.value)}
+                placeholder="Tell us about yourself..."
+                rows="4"
+              />
             </div>
           </div>
         </div>
-        
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">{success}</div>}
-        
+
         <div className="profile-actions">
-          <button className="save-button" onClick={handleSave} disabled={loading}>
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button className="cancel-button" onClick={() => window.location.reload()}>
-            Cancel
+          <button 
+            className="save-button" 
+            onClick={handleSave} 
+            disabled={saving || !profile.nickname.trim()}
+          >
+            {saving ? 'Saving...' : 'Save Profile'}
           </button>
         </div>
       </div>
+
     </div>
   );
-}
+};
 
 export default ProfilePage;

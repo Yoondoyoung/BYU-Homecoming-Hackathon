@@ -219,6 +219,18 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // users 테이블에서 사용자 프로필 정보 가져오기
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('nickname, major, hobby, gender, classes, favorite_foods, bio, profile_image_url')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      // 프로필이 없어도 로그인은 성공 처리
+    }
+
     // 로그인 성공
     res.json({
       message: '로그인 성공',
@@ -229,8 +241,16 @@ router.post('/login', async (req, res) => {
         email: data.user.email,
         email_confirmed: data.user.email_confirmed_at !== null,
         name: data.user.user_metadata?.name,
-        nickname: data.user.user_metadata?.nickname,
-        school: data.user.user_metadata?.school
+        nickname: userProfile?.nickname || data.user.user_metadata?.nickname,
+        school: data.user.user_metadata?.school,
+        // 추가 프로필 정보도 포함
+        major: userProfile?.major,
+        hobby: userProfile?.hobby,
+        gender: userProfile?.gender,
+        classes: userProfile?.classes,
+        favorite_foods: userProfile?.favorite_foods,
+        bio: userProfile?.bio,
+        profile_image_url: userProfile?.profile_image_url
       }
     });
   } catch (error) {

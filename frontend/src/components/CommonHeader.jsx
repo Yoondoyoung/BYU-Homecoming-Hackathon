@@ -2,21 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/CommonHeader.css';
 
-function CommonHeader({ currentPage, onPageChange }) {
-  const [user, setUser] = useState(null);
+function CommonHeader({ currentPage, onPageChange, user }) {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    // localStorage에서 사용자 정보 가져오기
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error('Error parsing user data:', error);
-      }
-    }
-  }, []);
 
   const handleLogout = async () => {
     try {
