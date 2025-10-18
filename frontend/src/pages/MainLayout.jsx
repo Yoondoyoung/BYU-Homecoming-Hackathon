@@ -22,6 +22,7 @@ function MainLayout() {
   const [isDirectChatInitiator, setIsDirectChatInitiator] = useState(false);
   const [directConversationId, setDirectConversationId] = useState(null);
   const [unreadDirectByUser, setUnreadDirectByUser] = useState({});
+  const [preloadedMessages, setPreloadedMessages] = useState([]);
 
   useEffect(() => {
     // localStorage에서 사용자 정보 가져오기
@@ -155,15 +156,20 @@ function MainLayout() {
   };
 
   const openDirectChat = useCallback(
-    (partner, { initiator = false, conversationId } = {}) => {
+    (partner, { initiator = false, conversationId, preloadMessages = [] } = {}) => {
       if (!partner || !user?.id || !socket) return;
       const finalConversationId = conversationId || computeConversationId(user.id, partner.id);
       if (!finalConversationId) return;
+
+      const normalizedPreload = Array.isArray(preloadMessages)
+        ? [...preloadMessages]
+        : [preloadMessages].filter(Boolean);
 
       setDirectChatPartner(partner);
       setDirectConversationId(finalConversationId);
       setIsDirectChatInitiator(initiator);
       setIsDirectChatOpen(true);
+      setPreloadedMessages(normalizedPreload);
       markConversationAsRead(partner.id);
     },
     [user?.id, socket, computeConversationId, markConversationAsRead]
@@ -172,10 +178,11 @@ function MainLayout() {
   const handleStartDirectChat = useCallback(
     (partner) => {
       if (!partner) return;
-      markConversationAsRead(partner.id);
-      openDirectChat(partner, { initiator: true });
+      const unreadEntry = unreadDirectByUser[partner.id];
+      const preloadMessages = unreadEntry?.previewMessages || unreadEntry?.messages || [];
+      openDirectChat(partner, { initiator: true, preloadMessages });
     },
-    [openDirectChat, markConversationAsRead]
+    [openDirectChat, unreadDirectByUser]
   );
 
   const handleCloseDirectChat = useCallback(() => {
@@ -186,6 +193,7 @@ function MainLayout() {
     setDirectChatPartner(null);
     setDirectConversationId(null);
     setIsDirectChatInitiator(false);
+    setPreloadedMessages([]);
   }, [directChatPartner, markConversationAsRead]);
 
   useEffect(() => {
@@ -197,17 +205,58 @@ function MainLayout() {
 
       setUnreadDirectByUser((prev) => {
         const prevEntry = prev?.[partnerId];
-        const updatedEntry = {
+        const preloadListRaw = payload.preloadMessages;
+        const preloadMessages = Array.isArray(preloadListRaw)
+          ? preloadListRaw
+          : preloadListRaw
+          ? [preloadListRaw]
+          : [];
+        const messageTime = payload.time || new Date().toLocaleTimeString();
+        const messageContent = payload.message || prevEntry?.message || '';
+        const notificationEntry = {
           ...prevEntry,
           ...payload,
           fromUser,
-          conversationId: payload.conversationId || prevEntry?.conversationId || computeConversationId(user.id, partnerId),
+          conversationId:
+            payload.conversationId || prevEntry?.conversationId || computeConversationId(user.id, partnerId),
+          message: messageContent,
+          time: messageTime,
           unreadCount: (prevEntry?.unreadCount || 0) + 1
         };
 
+        const combinedMessages = [...(prevEntry?.messages || [])];
+
+        preloadMessages.forEach((msg) => {
+          if (msg && typeof msg === 'object') {
+            combinedMessages.push({
+              conversationId: msg.conversationId || notificationEntry.conversationId,
+              senderId: msg.senderId || fromUser.id,
+              senderNickname: msg.senderNickname || fromUser.nickname || fromUser.name || 'Friend',
+              message: msg.message || '',
+              time: msg.time || messageTime,
+              type: msg.type || 'user'
+            });
+          }
+        });
+
+        if (messageContent) {
+          combinedMessages.push({
+            conversationId: notificationEntry.conversationId,
+            senderId: fromUser.id,
+            senderNickname: fromUser.nickname || fromUser.name || 'Friend',
+            message: messageContent,
+            time: messageTime,
+            type: payload.type || 'user'
+          });
+        }
+
+        notificationEntry.messages = combinedMessages.slice(-20);
+
+        notificationEntry.previewMessages = notificationEntry.messages;
+
         return {
           ...prev,
-          [partnerId]: updatedEntry
+          [partnerId]: notificationEntry
         };
       });
     };
@@ -225,22 +274,26 @@ function MainLayout() {
       };
 
       const conversationId = payload.conversationId || computeConversationId(payload.fromUser.id, user.id);
+      const preloadMessages = payload.metadata?.preloadMessages || [];
       const isCurrentChatOpen =
         isDirectChatOpen &&
         directChatPartner &&
         String(directChatPartner.id) === String(partner.id);
 
-      if (!isCurrentChatOpen) {
-        addUnreadEntry(partner, {
-          conversationId,
-          message:
-            payload.metadata?.preview || `${partner.nickname || 'Friend'} started a chat with you`,
-          time: payload.createdAt,
-          isInvite: true
-        });
-      } else {
-        openDirectChat(partner, { initiator: false, conversationId });
+      if (isCurrentChatOpen) {
+        markConversationAsRead(partner.id);
+        return;
       }
+
+      addUnreadEntry(partner, {
+        conversationId,
+        message:
+          payload.metadata?.preview || `${partner.nickname || 'Friend'} started a chat with you`,
+        time: payload.createdAt,
+        isInvite: true,
+        type: 'system',
+        preloadMessages
+      });
     };
 
     const handleDirectMessageNotification = (payload) => {
@@ -387,6 +440,7 @@ function MainLayout() {
         }
         targetUser={directChatPartner}
         conversationId={directConversationId}
+        initialMessages={preloadedMessages}
         isOpen={isDirectChatOpen}
         isInitiator={isDirectChatInitiator}
         onClose={handleCloseDirectChat}

@@ -6,12 +6,13 @@ function DirectChat({
   currentUser,
   targetUser,
   conversationId: conversationIdProp,
+  initialMessages = [],
   isOpen,
   isInitiator = false,
   onClose
 }) {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(initialMessages);
   const [participantCount, setParticipantCount] = useState(1);
   const messagesEndRef = useRef(null);
 
@@ -27,10 +28,16 @@ function DirectChat({
   const partnerInitial = partnerDisplayName ? partnerDisplayName.charAt(0).toUpperCase() : '?';
 
   const resetChatState = useCallback(() => {
-    setMessages([]);
+    setMessages(initialMessages);
     setMessage('');
     setParticipantCount(1);
-  }, []);
+  }, [initialMessages]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages, isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
