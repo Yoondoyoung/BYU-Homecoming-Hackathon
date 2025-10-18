@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/MatchingPage.css';
-import DirectChat from '../components/DirectChat';
 
 function MatchingPage({ onStartChat, unreadMap = {} }) {
   const [matchedUsers, setMatchedUsers] = useState([]);
@@ -9,9 +8,6 @@ function MatchingPage({ onStartChat, unreadMap = {} }) {
   const [lastMatchingAt, setLastMatchingAt] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserModal, setShowUserModal] = useState(false);
-  const [showDirectChat, setShowDirectChat] = useState(false);
-  const [conversationTopics, setConversationTopics] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
 
   // 매칭된 유저들 데이터 가져오기
   const fetchMatchedUsers = async () => {
@@ -119,33 +115,29 @@ function MatchingPage({ onStartChat, unreadMap = {} }) {
 
       const topicsData = await response.json();
       console.log('추천 질문들:', topicsData);
-      
-      // 추천 질문들을 저장하고 DirectChat 열기
-      setConversationTopics(topicsData);
+
       setShowUserModal(false);
-      setShowDirectChat(true);
-      
+      setSelectedUser(null);
+
+      if (typeof onStartChat === 'function') {
+        onStartChat(user, {
+          conversationTopics: topicsData
+        });
+      }
+
     } catch (error) {
       console.error('대화 시작 오류:', error);
-    }
-  };
+      setShowUserModal(false);
+      setSelectedUser(null);
 
-  // 현재 사용자 정보 가져오기
-  const getCurrentUser = () => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        setCurrentUser(user);
-      } catch (error) {
-        console.error('Error parsing user data:', error);
+      if (typeof onStartChat === 'function') {
+        onStartChat(user, { conversationTopics: null });
       }
     }
   };
 
   useEffect(() => {
     fetchMatchedUsers();
-    getCurrentUser();
   }, []);
 
   return (
@@ -340,23 +332,6 @@ function MatchingPage({ onStartChat, unreadMap = {} }) {
             </div>
           </div>
         </div>
-      )}
-
-      {/* DirectChat 컴포넌트 */}
-      {showDirectChat && selectedUser && currentUser && (
-        <DirectChat
-          socket={null} // 실제로는 socket 인스턴스를 전달해야 함
-          currentUser={currentUser}
-          targetUser={selectedUser}
-          isOpen={showDirectChat}
-          isInitiator={true}
-          onClose={() => {
-            setShowDirectChat(false);
-            setSelectedUser(null);
-            setConversationTopics(null);
-          }}
-          conversationTopics={conversationTopics}
-        />
       )}
     </div>
   );
