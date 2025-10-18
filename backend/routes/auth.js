@@ -3,24 +3,131 @@ const router = express.Router();
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth');
 
+// 허용된 학교와 도메인 매핑
+const allowedSchools = {
+  'byu': 'byu.edu',
+  'byuh': 'byuh.edu', 
+  'byui': 'byui.edu'
+};
+
+// 이메일 도메인 검증 함수
+function validateEmailDomain(email, selectedSchool) {
+  if (!selectedSchool || !allowedSchools[selectedSchool]) {
+    return { valid: false, message: 'Invalid school selection' };
+  }
+  
+  const emailParts = email.split('@');
+  if (emailParts.length !== 2) {
+    return { valid: false, message: 'Invalid email format' };
+  }
+  
+  const emailDomain = emailParts[1].toLowerCase();
+  const expectedDomain = allowedSchools[selectedSchool];
+  
+  if (emailDomain !== expectedDomain) {
+    return { 
+      valid: false, 
+      message: `Email must be from ${expectedDomain} for selected school` 
+    };
+  }
+  
+  return { valid: true };
+}
+
 // 회원가입 (이메일 인증 포함)
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, nickname, school } = req.body;
 
     // 입력 검증
-    if (!email || !password) {
+    if (!email || !password || !school || !nickname) {
       return res.status(400).json({ 
         error: 'Missing required fields',
-        message: '이메일과 비밀번호는 필수입니다.' 
+        message: 'Email, password, nickname, and school are required.' 
       });
+    }
+
+    // 닉네임 길이 검증
+    if (nickname.length < 2 || nickname.length > 20) {
+      return res.status(400).json({ 
+        error: 'Invalid nickname',
+        message: 'Nickname must be between 2 and 20 characters.' 
+      });
+    }
+
+    // 닉네임 중복 체크 (Supabase Admin API 사용)
+    try {
+      console.log('Checking for existing nickname:', nickname);
+      const { data: existingNickname, error: nicknameCheckError } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+        filter: `raw_user_meta_data->nickname.eq.${nickname}`
+      });
+      
+      console.log('Existing nickname check result:', { existingNickname, nicknameCheckError });
+      
+      if (nicknameCheckError) {
+        console.error('Error checking existing nickname:', nicknameCheckError);
+        // 에러가 있지만 회원가입을 계속 진행
+      } else if (existingNickname && existingNickname.users && existingNickname.users.length > 0) {
+        console.log('Found existing nickname:', existingNickname.users[0]);
+        // 닉네임이 이미 존재하는 경우
+        return res.status(400).json({ 
+          error: 'Nickname already taken',
+          message: 'This nickname is already taken. Please choose a different nickname.' 
+        });
+      } else {
+        console.log('No existing nickname found, proceeding with registration');
+      }
+    } catch (nicknameCheckError) {
+      console.error('Error in nickname check:', nicknameCheckError);
+      // 닉네임 확인 중 에러가 발생해도 회원가입을 계속 진행
+    }
+
+    // 학교-이메일 도메인 검증
+    const domainValidation = validateEmailDomain(email, school);
+    if (!domainValidation.valid) {
+      return res.status(400).json({ 
+        error: 'Invalid email domain',
+        message: domainValidation.message 
+      });
+    }
+
+    // 기존 사용자 확인 (Supabase Admin API 사용)
+    try {
+      console.log('Checking for existing user with email:', email);
+      const { data: existingUser, error: checkError } = await supabaseAdmin.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000, // 충분히 큰 수로 설정
+        filter: `email.eq.${encodeURIComponent(email)}`
+      });
+      
+      console.log('Existing user check result:', { existingUser, checkError });
+      
+      if (checkError) {
+        console.error('Error checking existing user:', checkError);
+        // 에러가 있지만 회원가입을 계속 진행
+      } else if (existingUser && existingUser.users && existingUser.users.length > 0) {
+        console.log('Found existing user:', existingUser.users[0]);
+        // 사용자가 이미 존재하는 경우
+        return res.status(400).json({ 
+          error: 'Email already registered',
+          message: 'This email is already registered. Please use a different email or try logging in.' 
+        });
+      } else {
+        console.log('No existing user found, proceeding with registration');
+      }
+    } catch (checkError) {
+      console.error('Error in user check:', checkError);
+      // 사용자 확인 중 에러가 발생해도 회원가입을 계속 진행
+      // (Supabase 설정에 따라 다를 수 있음)
     }
 
     // 비밀번호 강도 검증 (최소 6자)
     if (password.length < 6) {
       return res.status(400).json({ 
         error: 'Weak password',
-        message: '비밀번호는 최소 6자 이상이어야 합니다.' 
+        message: 'Password must be at least 6 characters long.' 
       });
     }
 
@@ -33,31 +140,55 @@ router.post('/register', async (req, res) => {
         emailRedirectTo: `${process.env.FRONTEND_URL}/email-verified`,
         data: {
           name: name || null,
+          nickname: nickname,
+          school: school
         }
       }
     });
 
+    // Supabase 응답 디버깅
+    console.log('Supabase signUp response:', { data, error });
+
     if (error) {
+      let message = 'Registration failed.';
+      // Supabase의 다양한 중복 이메일 에러 메시지 처리
+      if (error.message.includes('already registered') || 
+          error.message.includes('User already registered') ||
+          error.message.includes('already been registered') ||
+          error.message.includes('email address is already registered')) {
+        message = 'This email is already registered. Please use a different email or try logging in.';
+      }
       return res.status(400).json({ 
         error: error.message,
-        message: '회원가입에 실패했습니다.' 
+        message: message 
+      });
+    }
+
+    // 중복 이메일인 경우 Supabase가 성공 응답을 보내지만 user가 null일 수 있음
+    if (!data.user) {
+      return res.status(400).json({ 
+        error: 'Email already registered',
+        message: 'This email is already registered. Please use a different email or try logging in.' 
       });
     }
 
     // 회원가입 성공
     res.status(201).json({
-      message: '회원가입이 완료되었습니다. 이메일을 확인하여 인증을 완료해주세요.',
+      message: 'Registration completed. Please check your email to verify your account.',
       user: {
         id: data.user.id,
         email: data.user.email,
-        email_confirmed: data.user.email_confirmed_at !== null
+        email_confirmed: data.user.email_confirmed_at !== null,
+        name: name,
+        nickname: nickname,
+        school: school
       }
     });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ 
       error: 'Registration failed',
-      message: '회원가입 처리 중 오류가 발생했습니다.' 
+      message: 'An error occurred during registration.' 
     });
   }
 });
@@ -97,7 +228,9 @@ router.post('/login', async (req, res) => {
         id: data.user.id,
         email: data.user.email,
         email_confirmed: data.user.email_confirmed_at !== null,
-        name: data.user.user_metadata?.name
+        name: data.user.user_metadata?.name,
+        nickname: data.user.user_metadata?.nickname,
+        school: data.user.user_metadata?.school
       }
     });
   } catch (error) {
