@@ -71,15 +71,18 @@ function CommonHeader({ currentPage, onPageChange, user }) {
             >
               Matching
             </button>
+            <button 
+              className={`page-button ${currentPage === 'leaderboard' ? 'active' : ''}`}
+              onClick={() => onPageChange('leaderboard')}
+            >
+              🏆 Leaderboard
+            </button>
           </div>
         </div>
 
         {user && (
           <div className="header-right">
             <div className="user-info">
-              <button className="logout-button" onClick={handleLogout}>
-                Logout
-              </button>
               <button className="profile-button" onClick={handleProfileClick}>
                 <div className="profile-avatar">
                   {user.profile_image ? (
@@ -91,6 +94,9 @@ function CommonHeader({ currentPage, onPageChange, user }) {
                   )}
                 </div>
                 <span className="profile-nickname">{user.nickname || user.name || 'User'}</span>
+              </button>
+              <button className="logout-button" onClick={handleLogout}>
+                Logout
               </button>
             </div>
           </div>
