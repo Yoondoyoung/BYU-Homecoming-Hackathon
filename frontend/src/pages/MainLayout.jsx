@@ -3,6 +3,7 @@ import CommonHeader from '../components/CommonHeader.jsx';
 import MapBox from '../components/mapbox.jsx';
 import ChatPage from './ChatPage.jsx';
 import MatchingPage from './MatchingPage.jsx';
+import LeaderboardPage from './LeaderboardPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import '../styles/MainLayout.css';
 
@@ -33,6 +34,10 @@ function MainLayout() {
         
         {currentPage === 'matching' && (
           <MatchingPage />
+        )}
+        
+        {currentPage === 'leaderboard' && (
+          <LeaderboardPage />
         )}
         
         {currentPage === 'profile' && (

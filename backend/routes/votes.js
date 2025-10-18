@@ -230,6 +230,12 @@ router.post('/vote', authenticateToken, async (req, res) => {
       }
     }
 
+    // Get user nickname from auth metadata
+    const userNickname = req.user.user_metadata?.nickname || 
+                        req.user.user_metadata?.name || 
+                        req.user.email?.split('@')[0] || 
+                        'Anonymous';
+
     // Create new vote (either first time or new day)
     const { data: newVote, error: insertError } = await supabaseAdmin
       .from('building_votes')
@@ -237,6 +243,7 @@ router.post('/vote', authenticateToken, async (req, res) => {
         building_id: buildingId,
         user_id: userId,
         vote_option: voteOption,
+        user_nickname: userNickname,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -339,6 +346,93 @@ router.get('/all', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to get all votes',
       message: 'An error occurred while fetching all votes.' 
+    });
+  }
+});
+
+// Weekly leaderboard - Get top voters of the week
+router.get('/leaderboard/weekly', async (req, res) => {
+  try {
+    // Calculate start of current week (Sunday 00:00:00)
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 (Sunday) to 6 (Saturday)
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    console.log('📅 Getting leaderboard from:', startOfWeek.toISOString());
+
+    // Get all votes from this week with user nicknames
+    const { data: votes, error: votesError } = await supabaseAdmin
+      .from('building_votes')
+      .select('user_id, user_nickname, created_at')
+      .gte('created_at', startOfWeek.toISOString());
+
+    if (votesError) {
+      console.error('Error fetching votes:', votesError);
+      return res.status(500).json({ 
+        error: 'Failed to fetch votes',
+        message: 'Failed to fetch leaderboard data.' 
+      });
+    }
+
+    // Count votes per user and track nickname
+    const userVoteCounts = {};
+    votes.forEach(vote => {
+      const userId = vote.user_id;
+      if (!userVoteCounts[userId]) {
+        userVoteCounts[userId] = {
+          count: 0,
+          nickname: vote.user_nickname || 'Anonymous'
+        };
+      }
+      userVoteCounts[userId].count++;
+    });
+
+    // Sort users by vote count (descending)
+    const sortedUsers = Object.entries(userVoteCounts)
+      .map(([userId, data]) => ({ 
+        userId, 
+        count: data.count,
+        nickname: data.nickname
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10 users
+
+    console.log('🏆 Top voters:', sortedUsers.length);
+
+    // Get user details for top voters
+    if (sortedUsers.length === 0) {
+      return res.json({
+        leaderboard: [],
+        weekStart: startOfWeek.toISOString(),
+        message: 'No votes yet this week!'
+      });
+    }
+
+    // Create leaderboard directly from vote data
+    const leaderboard = sortedUsers.map((item, index) => {
+      return {
+        rank: index + 1,
+        userId: item.userId,
+        voteCount: item.count,
+        nickname: item.nickname
+      };
+    });
+
+    const weekEnd = new Date(startOfWeek.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    res.json({
+      leaderboard,
+      weekStart: startOfWeek.toISOString(),
+      weekEnd: weekEnd.toISOString()
+    });
+
+  } catch (error) {
+    console.error('Leaderboard error:', error);
+    res.status(500).json({ 
+      error: 'Failed to get leaderboard',
+      message: 'An error occurred while fetching leaderboard.' 
     });
   }
 });
