@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 4001;
 // Import routes
 const authRoutes = require('./routes/auth');
 const voteRoutes = require('./routes/votes');
+const { supabase } = require('./config/supabase');
 
 // Middleware
 app.use(cors({
@@ -34,6 +35,38 @@ app.get('/api/health', (req, res) => {
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// Buildings API endpoint
+app.get('/api/buildings', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('buildings')
+      .select('*')
+      .eq('is_active', true)
+      .order('id');
+
+    if (error) {
+      console.error('Error fetching buildings:', error);
+      return res.status(500).json({ error: 'Failed to fetch buildings' });
+    }
+
+    // Transform data to match frontend format
+    const buildings = data.map(building => ({
+      id: building.id,
+      name: building.name,
+      lat: parseFloat(building.latitude),
+      lng: parseFloat(building.longitude),
+      radius: building.radius,
+      owner: building.owner,
+      description: building.description
+    }));
+
+    res.json(buildings);
+  } catch (error) {
+    console.error('Error in buildings API:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Basic route

@@ -19,82 +19,7 @@ export default function MapBox() {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Spot data (BYU campus example)
-  const [spots] = useState([
-    {
-      id: 1,
-      name: "Harold B. Lee Library",
-      lat: 40.2487,
-      lng: -111.64929,
-      radius: 70,
-      owner: "Love Mint Chocolate",
-    },
-    {
-      id: 2,
-      name: "Wilkinson Center",
-      lat: 40.2486,
-      lng: -111.6474,
-      radius: 90,
-      owner: "Hate Mint Chocolate",
-    },
-    {
-      id: 3,
-      name: "Clyde Engineering Building",
-      lat: 40.2467,
-      lng: -111.648,
-      radius: 80,
-      owner: "Love Mint Chocolate",
-    },
-    {
-      id: 5,
-      name: "Talmage Math Sciences",
-      lat: 40.2496,
-      lng: -111.6508,
-      radius: 60,
-      owner: "Love Mint Chocolate",
-    },
-    {
-      id: 6,
-      name: "Eyring Science Center",
-      lat: 40.24732,
-      lng: -111.65031,
-      radius: 65,
-      owner: "Hate Mint Chocolate",
-    },
-    {
-      id: 7,
-      name: "Life Sciences Building",
-      lat: 40.2450,
-      lng: -111.6493,
-      radius: 65,
-      owner: "Love Mint Chocolate",
-    },
-    {
-      id: 10,
-      name: "Tanner Building",
-      lat: 40.2504,
-      lng: -111.6525,
-      radius: 63,
-      owner: "Hate Mint Chocolate",
-    },
-    {
-      id: 11,
-      name: "Joseph Smith Building",
-      lat: 40.24588,
-      lng: -111.65165,
-      radius: 55,
-      owner: "Love Mint Chocolate",
-    },
-    {
-      id: 12,
-      name: "Law School (Hunter Law Library)",
-      lat: 40.2495,
-      lng: -111.6453,
-      radius: 75,
-      owner: "Hate Mint Chocolate",
-    },
-  ]);
+  const [spots, setSpots] = useState([]);
 
   // Distance calculation function (Haversine)
   const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -108,6 +33,28 @@ export default function MapBox() {
         Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
+
+  // Fetch spots data from API
+  useEffect(() => {
+    const fetchSpots = async () => {
+      try {
+        console.log('🏢 Fetching spots from API...');
+        const response = await fetch('http://localhost:4001/api/buildings');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const spotsData = await response.json();
+        console.log('✅ Spots fetched successfully:', spotsData.length, 'buildings');
+        setSpots(spotsData);
+      } catch (error) {
+        console.error('❌ Error fetching spots:', error);
+        // Fallback to empty array if API fails
+        setSpots([]);
+      }
+    };
+
+    fetchSpots();
+  }, []);
 
   // Initialize Socket.IO connection
   useEffect(() => {
@@ -136,6 +83,20 @@ export default function MapBox() {
 
     return () => newSocket.close();
   }, []);
+
+  // Add map layers when both map and spots are loaded
+  useEffect(() => {
+    if (isMapLoaded && spots.length > 0) {
+      console.log("🗺️ Adding map layers with", spots.length, "spots");
+      try {
+        addSpotLayers();
+        addRadiusPolygons();
+        console.log("✅ Map layers added successfully");
+      } catch (error) {
+        console.error("❌ Error adding map layers:", error);
+      }
+    }
+  }, [isMapLoaded, spots]);
 
   // Join spot chat when user manually opens chat
   const joinSpotChat = (spot) => {
@@ -210,16 +171,8 @@ export default function MapBox() {
 
     map.current.on("load", () => {
       console.log("🗺️ Map loaded successfully");
-      try {
-        addSpotLayers();
-        addRadiusPolygons();
-        setIsMapLoaded(true);
-        setIsLoading(false);
-        console.log("✅ Map layers added successfully");
-      } catch (error) {
-        console.error("❌ Error adding map layers:", error);
-        setIsLoading(false);
-      }
+      setIsMapLoaded(true);
+      setIsLoading(false);
     });
 
     map.current.on("error", (e) => {
