@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import MapBox from '../components/mapbox';
 import './MapPage.css';
 
 function MapPage() {
@@ -67,10 +68,7 @@ function MapPage() {
         </div>
       </div>
       <div className="map-content">
-        <div className="coming-soon">
-          <h2>Map Coming Soon!</h2>
-          <p>Interactive map feature will be implemented here.</p>
-        </div>
+        <MapBox />
       </div>
     </div>
   );
