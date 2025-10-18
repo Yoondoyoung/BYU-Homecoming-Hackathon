@@ -68,7 +68,10 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
   // 투표하기
   const handleVote = async (voteOption) => {
     const token = localStorage.getItem('access_token');
+    console.log('🗳️  Attempting to vote:', { buildingId, voteOption, hasToken: !!token });
+    
     if (!token) {
+      console.error('❌ No access token found');
       setError('투표하려면 로그인이 필요합니다.');
       return;
     }
@@ -77,6 +80,7 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
     setError(null);
 
     try {
+      console.log('📤 Sending vote request to:', 'http://localhost:4001/api/votes/vote');
       const response = await fetch('http://localhost:4001/api/votes/vote', {
         method: 'POST',
         headers: {
@@ -89,18 +93,22 @@ const VoteComponent = ({ buildingId, buildingName, onClose }) => {
         })
       });
 
+      console.log('📥 Vote response status:', response.status);
+
       if (response.ok) {
         const result = await response.json();
+        console.log('✅ Vote successful:', result);
         setUserVote(voteOption);
         setHasVoted(true);
         // 투표 데이터 다시 가져오기
         await fetchVoteData();
       } else {
         const errorData = await response.json();
+        console.error('❌ Vote failed:', errorData);
         setError(errorData.message || '투표에 실패했습니다.');
       }
     } catch (err) {
-      console.error('Error voting:', err);
+      console.error('❌ Error voting:', err);
       setError('투표 처리 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
