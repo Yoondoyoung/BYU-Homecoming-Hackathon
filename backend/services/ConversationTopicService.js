@@ -21,7 +21,6 @@ class ConversationTopicService {
             // 사용자 프로필 정보를 문자열로 변환
             const profileInfo = this.formatProfileInfo(userProfile);
             const currentUserInfo = currentUserProfile ? this.formatProfileInfo(currentUserProfile) : null;
-            ㅍㅍ
             // ChatGPT 프롬프트 구성
             const prompt = this.buildConversationPrompt(profileInfo, currentUserInfo);
             
