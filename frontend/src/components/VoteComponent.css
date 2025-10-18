@@ -1,0 +1,272 @@
+/* VoteComponent.css */
+.vote-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.vote-popup {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: popupSlideIn 0.3s ease-out;
+}
+
+@keyframes popupSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.vote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.vote-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.vote-content {
+  padding: 24px;
+}
+
+.vote-question {
+  margin-bottom: 24px;
+}
+
+.vote-question p {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #374151;
+  text-align: center;
+}
+
+.vote-description {
+  margin-top: 8px !important;
+  font-size: 0.9rem !important;
+  color: #6b7280 !important;
+  font-weight: 500;
+}
+
+.error-message {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+
+.vote-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.vote-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  background-color: #fafafa;
+}
+
+.vote-option:hover {
+  border-color: #3b82f6;
+  background-color: #f8fafc;
+}
+
+.vote-button {
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: #6b7280;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vote-button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.vote-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vote-button.selected {
+  background-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.vote-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vote-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.vote-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-fill.option-a {
+  background-color: #3b82f6;
+}
+
+.progress-fill.option-b {
+  background-color: #10b981;
+}
+
+.vote-count {
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-align: right;
+}
+
+
+.vote-summary {
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.vote-summary p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 480px) {
+  .vote-popup {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .vote-header {
+    padding: 16px 20px 12px;
+  }
+  
+  .vote-header h3 {
+    font-size: 1.3rem;
+  }
+  
+  .vote-content {
+    padding: 20px;
+  }
+  
+  .vote-option {
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .vote-button {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
+  }
+  
+  .vote-label {
+    font-size: 1rem;
+  }
+  
+  .vote-count {
+    font-size: 0.8rem;
+  }
+}
+
+/* 로딩 상태 */
+.vote-button:disabled {
+  position: relative;
+}
+
+.vote-button:disabled::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

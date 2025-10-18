@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import VoteComponent from "./VoteComponent";
 import "./mapbox.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
@@ -9,6 +10,7 @@ export default function MapBox() {
   const map = useRef(null);
   const userMarkerRef = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
 
   // Spot 데이터 (BYU 캠퍼스 예시)
   const [spots] = useState([
@@ -187,14 +189,14 @@ export default function MapBox() {
       paint: { "text-color": "#111" },
     });
 
-    // Popup
+    // Popup - 투표 컴포넌트로 변경
     map.current.on("click", "spot-symbols", (e) => {
       const f = e.features[0];
-      const { name, owner } = f.properties;
-      new mapboxgl.Popup({ offset: 15 })
-        .setLngLat(f.geometry.coordinates)
-        .setHTML(`<b>${name}</b><br/>현재 점령: ${owner}`)
-        .addTo(map.current);
+      const { name, id } = f.properties;
+      setSelectedBuilding({
+        id: id,
+        name: name
+      });
     });
   };
 
@@ -260,6 +262,13 @@ export default function MapBox() {
   return (
     <div className="map-wrapper">
       <div ref={mapContainer} className="map-container-inner" />
+      {selectedBuilding && (
+        <VoteComponent
+          buildingId={selectedBuilding.id}
+          buildingName={selectedBuilding.name}
+          onClose={() => setSelectedBuilding(null)}
+        />
+      )}
     </div>
   );
 }
