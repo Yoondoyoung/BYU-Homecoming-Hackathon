@@ -120,54 +120,6 @@
   margin-top: -2px;
 }
 
-.current-spot-indicator {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: 25px;
-  padding: 10px 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.spot-indicator-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.spot-indicator-icon {
-  font-size: 1.2rem;
-}
-
-.spot-indicator-text {
-  font-weight: 600;
-  color: #334155;
-  font-size: 0.9rem;
-}
-
-.spot-chat-toggle {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  border-radius: 50%;
-  width: 35px;
-  height: 35px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 1.1rem;
-  transition: transform 0.2s;
-}
-
-.spot-chat-toggle:hover {
-  transform: scale(1.1);
-}
-
 /* User location pulse animation */
 .user-marker-pulse {
   position: relative;

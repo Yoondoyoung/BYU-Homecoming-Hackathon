@@ -1,21 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import io from "socket.io-client";
-import SpotChat from "./SpotChat.jsx";
 import VoteComponent from "./VoteComponent.jsx";
 import "../styles/mapbox.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
 
-export default function MapBox() {
+export default function MapBox({ onSpotEnter, onSpotLeave, currentSpot }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
-  const [currentSpot, setCurrentSpot] = useState(null);
-  const [socket, setSocket] = useState(null);
-  const [nickname, setNickname] = useState("");
-  const [showSpotChat, setShowSpotChat] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -174,33 +168,6 @@ export default function MapBox() {
     });
   }, []);
 
-  // Initialize Socket.IO connection
-  useEffect(() => {
-    const newSocket = io("http://localhost:4001");
-    setSocket(newSocket);
-
-    // Get nickname from user profile
-    const userData = localStorage.getItem("user");
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        const userNickname = user.nickname || user.name || "Anonymous";
-        setNickname(userNickname);
-        newSocket.emit("setNickname", userNickname);
-        console.log(`🎭 Using profile nickname: ${userNickname}`);
-      } catch (error) {
-        console.error("Error parsing user data:", error);
-        setNickname("Anonymous");
-        newSocket.emit("setNickname", "Anonymous");
-      }
-    } else {
-      // Fallback if no user data
-      setNickname("Anonymous");
-      newSocket.emit("setNickname", "Anonymous");
-    }
-
-    return () => newSocket.close();
-  }, []);
 
   // Add map layers when both map and spots are loaded
   useEffect(() => {
@@ -226,32 +193,6 @@ export default function MapBox() {
     safelyAddLayers();
   }, [isMapLoaded, spots, buildingVotes]);
 
-  // Join spot chat when user manually opens chat
-  const joinSpotChat = (spot) => {
-    if (socket && nickname) {
-      socket.emit("joinSpotChat", {
-        spotId: spot.id,
-        spotName: spot.name,
-      });
-      setShowSpotChat(true);
-      console.log(`📍 Joined ${spot.name} chat room`);
-    }
-  };
-
-  // Leave spot chat when exiting a spot
-  const leaveSpotChat = () => {
-    if (socket && currentSpot) {
-      socket.emit("leaveSpotChat");
-      setCurrentSpot(null);
-      setShowSpotChat(false);
-      console.log(`📍 Left ${currentSpot.name} chat room`);
-    }
-  };
-
-  // Close spot chat manually
-  const closeSpotChat = () => {
-    setShowSpotChat(false);
-  };
 
   // 위도/경도 중심 + 반경(m) → 원형 polygon 생성
   const createCircle = (center, radiusInMeters, points = 64) => {
@@ -566,7 +507,7 @@ export default function MapBox() {
 
   // Spot entry detection with automatic chat joining
   useEffect(() => {
-    if (!userLocation || !socket) return;
+    if (!userLocation || spots.length === 0) return;
 
     let enteredSpot = null;
 
@@ -588,15 +529,15 @@ export default function MapBox() {
 
     // Update current spot without auto-opening chat
     if (enteredSpot && (!currentSpot || currentSpot.id !== enteredSpot.id)) {
-      setCurrentSpot(enteredSpot);
+      onSpotEnter(enteredSpot);
       console.log(`📍 Entered ${enteredSpot.name} - Chat available`);
     }
 
     // Auto-leave spot chat if not in any spot
     if (!enteredSpot && currentSpot) {
-      leaveSpotChat();
+      onSpotLeave();
     }
-  }, [userLocation, socket, currentSpot]);
+  }, [userLocation, spots, currentSpot, onSpotEnter, onSpotLeave]);
 
   return (
     <div className="map-wrapper">
@@ -610,39 +551,6 @@ export default function MapBox() {
       )}
       <div ref={mapContainer} className="map-container-inner" />
 
-      {/* Spot Chat Overlay */}
-      {showSpotChat && currentSpot && (
-        <SpotChat
-          socket={socket}
-          currentSpot={currentSpot}
-          nickname={nickname}
-          onClose={closeSpotChat}
-        />
-      )}
-
-      {/* Current Spot Indicator */}
-      {currentSpot && (
-        <div className="current-spot-indicator">
-          <div className="spot-indicator-content">
-            <span className="spot-indicator-icon">📍</span>
-            <span className="spot-indicator-text">
-              You're at {currentSpot.name}
-            </span>
-            <button
-              className="spot-chat-toggle"
-              onClick={() => {
-                if (!showSpotChat) {
-                  joinSpotChat(currentSpot);
-                } else {
-                  setShowSpotChat(false);
-                }
-              }}
-            >
-              💬
-            </button>
-          </div>
-        </div>
-      )}
       {selectedBuilding && (
         <VoteComponent
           buildingId={selectedBuilding.id}

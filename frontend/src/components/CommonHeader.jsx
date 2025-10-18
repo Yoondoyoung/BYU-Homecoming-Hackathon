@@ -60,12 +60,6 @@ function CommonHeader({ currentPage, onPageChange, user }) {
               Map
             </button>
             <button 
-              className={`page-button ${currentPage === 'chat' ? 'active' : ''}`}
-              onClick={() => onPageChange('chat')}
-            >
-              Chat
-            </button>
-            <button 
               className={`page-button ${currentPage === 'matching' ? 'active' : ''}`}
               onClick={() => onPageChange('matching')}
             >

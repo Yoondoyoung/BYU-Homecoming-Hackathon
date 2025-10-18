@@ -1,4 +1,5 @@
-.spot-chat-overlay {
+/* Overlay Mode (for modal-style chat) */
+.spot-chat-container.overlay-mode {
   position: fixed;
   top: 0;
   left: 0;
@@ -11,7 +12,7 @@
   z-index: 1000;
 }
 
-.spot-chat-container {
+.spot-chat-container.overlay-mode > div {
   width: 400px;
   height: 500px;
   background: white;
@@ -22,17 +23,33 @@
   overflow: hidden;
 }
 
+/* Sidebar Mode (for split-screen layout) */
+.spot-chat-container.sidebar-mode {
+  width: 100%;
+  height: 100%;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .spot-chat-header {
+  position: relative;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 15px 20px;
+  padding: 18px 24px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.spot-info {
+  padding-right: 48px;
 }
 
 .spot-info h3 {
-  margin: 0 0 5px 0;
+  margin: 0;
   font-size: 1.2rem;
 }
 
@@ -43,23 +60,28 @@
 }
 
 .close-button {
-  background: none;
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.95);
   border: none;
-  color: white;
-  font-size: 1.5rem;
+  color: #111827;
+  font-size: 1.2rem;
   cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background-color 0.3s;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .close-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.25);
 }
 
 .spot-messages-container {
@@ -156,6 +178,7 @@
   background: white;
   border-top: 1px solid #e2e8f0;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .spot-message-input {
