@@ -19,13 +19,20 @@ export default function ChatRoom() {
         const user = JSON.parse(userData);
         const userNickname = user.nickname || user.name || 'Anonymous';
         setNickname(userNickname);
-        socket.emit('setNickname', userNickname);
+        socket.emit('setNickname', {
+          nickname: userNickname,
+          userId: user.id,
+          profileImage: user.profile_image_url
+        });
         console.log(`🎭 ChatRoom using profile nickname: ${userNickname}`);
       } catch (error) {
         console.error('Error parsing user data:', error);
         setNickname('Anonymous');
         socket.emit('setNickname', 'Anonymous');
       }
+    } else {
+      setNickname('Anonymous');
+      socket.emit('setNickname', 'Anonymous');
     }
   }, []);
 

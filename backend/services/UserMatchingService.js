@@ -1,11 +1,17 @@
 // 유저 매칭 서비스 - 단계별 구현
 const { supabaseAdmin } = require('../config/supabase');
 const OpenAI = require('openai');
-require('dotenv').config();
+const path = require('path');
+
+// Load environment variables from backend/.env even if this file is required from elsewhere
+require('dotenv').config({
+    path: path.resolve(__dirname, '..', '.env')
+});
 
 class UserMatchingService {
     constructor() {
         this.chatGPT = null; // 나중에 초기화
+        this.currentApiKey = null;
         this.allUsersData = null; // 모든 유저 정보를 JSON으로 저장
     }
 
@@ -13,10 +19,17 @@ class UserMatchingService {
      * ChatGPT 서비스 초기화 (필요할 때만)
      */
     initializeChatGPT() {
-        if (!this.chatGPT) {
+        const apiKey = process.env.OPENAI_API_KEY;
+        
+        if (!apiKey || /your[_-]?actual/i.test(apiKey)) {
+            throw new Error('OPENAI_API_KEY가 설정되지 않았거나 기본값(placeholder) 상태입니다. backend/.env 파일을 확인하고 서버를 다시 시작해주세요.');
+        }
+
+        if (!this.chatGPT || this.currentApiKey !== apiKey) {
             this.chatGPT = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY,
+                apiKey
             });
+            this.currentApiKey = apiKey;
         }
         return this.chatGPT;
     }
@@ -28,10 +41,6 @@ class UserMatchingService {
      */
     async generateResponse(prompt) {
         try {
-            if (!process.env.OPENAI_API_KEY) {
-                throw new Error('OPENAI_API_KEY가 .env 파일에 설정되지 않았습니다.');
-            }
-
             const openai = this.initializeChatGPT();
             const completion = await openai.chat.completions.create({
                 model: 'gpt-3.5-turbo',
