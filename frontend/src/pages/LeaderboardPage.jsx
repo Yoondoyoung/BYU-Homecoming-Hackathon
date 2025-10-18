@@ -116,7 +116,7 @@ const LeaderboardPage = () => {
 
         <div className="leaderboard-footer">
           <button onClick={fetchLeaderboard} className="refresh-button" disabled={loading}>
-            🔄 Refresh
+            Refresh
           </button>
           <p className="footer-note">
             💡 Vote on buildings to earn points and climb the leaderboard!

@@ -37,7 +37,7 @@
 
 .spot-chat-header {
   position: relative;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #6495ED;
   color: white;
   padding: 18px 24px;
   display: flex;
@@ -201,7 +201,7 @@
 }
 
 .spot-send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #6495ED;
   color: white;
   border: none;
   padding: 12px 20px;
@@ -213,6 +213,7 @@
 }
 
 .spot-send-button:hover {
+  background: #4A7BC8;
   transform: translateY(-1px);
 }
 
