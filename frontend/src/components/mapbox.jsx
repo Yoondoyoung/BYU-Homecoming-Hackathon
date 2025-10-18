@@ -20,6 +20,7 @@ export default function MapBox() {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [spots, setSpots] = useState([]);
+  const [locationPermission, setLocationPermission] = useState('unknown');
 
   // Distance calculation function (Haversine)
   const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -58,6 +59,73 @@ export default function MapBox() {
     };
 
     fetchSpots();
+  }, []);
+
+  // Check location permission and get initial location on mount
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      console.error("Geolocation is not supported by this browser");
+      setLocationPermission('error');
+      return;
+    }
+
+    console.log("📍 Checking location permission...");
+    
+    // Check if permission is already granted
+    navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+      console.log("🔍 Location permission status:", result.state);
+      
+      if (result.state === 'granted') {
+        setLocationPermission('granted');
+        // Permission already granted, get current position immediately
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log("✅ Got initial location:", latitude, longitude);
+            setUserLocation({ lat: latitude, lng: longitude });
+          },
+          (error) => {
+            console.error("❌ Error getting initial location:", error);
+            setLocationPermission('error');
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else if (result.state === 'denied') {
+        setLocationPermission('denied');
+      } else {
+        // Permission not determined yet, request it
+        setLocationPermission('prompt');
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log("✅ Permission granted, got initial location:", latitude, longitude);
+            setUserLocation({ lat: latitude, lng: longitude });
+            setLocationPermission('granted');
+          },
+          (error) => {
+            console.error("❌ Location permission denied:", error);
+            setLocationPermission('denied');
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+    }).catch(() => {
+      // Fallback for browsers that don't support permissions API
+      console.log("🔄 Permissions API not supported, requesting location directly...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          console.log("✅ Got initial location:", latitude, longitude);
+          setUserLocation({ lat: latitude, lng: longitude });
+          setLocationPermission('granted');
+        },
+        (error) => {
+          console.error("❌ Location permission denied:", error);
+          setLocationPermission('denied');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    });
   }, []);
 
   // Initialize Socket.IO connection
@@ -194,16 +262,22 @@ export default function MapBox() {
       setIsLoading(false);
     });
 
-    navigator.geolocation.watchPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        console.log("📍 User location updated:", latitude, longitude);
-        setUserLocation({ lat: latitude, lng: longitude });
-      },
-      (err) => console.error("GPS Error:", err),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-    );
-  }, []);
+    // Start watching position only if permission is granted
+    if (locationPermission === 'granted') {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          console.log("📍 User location updated:", latitude, longitude);
+          setUserLocation({ lat: latitude, lng: longitude });
+        },
+        (err) => {
+          console.error("GPS Error:", err);
+          setLocationPermission('error');
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      );
+    }
+  }, [locationPermission]);
 
   // Spot symbol layer 추가
   const addSpotLayers = () => {
