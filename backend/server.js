@@ -20,6 +20,7 @@ const PORT = process.env.PORT || 4001;
 const authRoutes = require('./routes/auth');
 const voteRoutes = require('./routes/votes');
 const { supabase } = require('./config/supabase');
+const UserMatchingService = require('./services/UserMatchingService');
 
 // Middleware
 app.use(cors({
@@ -193,6 +194,79 @@ app.use('/api/auth', authRoutes);
 
 // Vote routes
 app.use('/api/votes', voteRoutes);
+
+// Matching API endpoints
+const matchingService = new UserMatchingService();
+
+// 매칭된 유저들 조회
+app.get('/api/matching/matched-users', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const matchedUsers = await matchingService.getMatchedUsersProfiles(user.id);
+    res.json(matchedUsers);
+  } catch (error) {
+    console.error('Error fetching matched users:', error);
+    res.status(500).json({ error: 'Failed to fetch matched users' });
+  }
+});
+
+// 새로운 매칭 실행
+app.post('/api/matching/find-matches', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const matchingResult = await matchingService.findMatches(token);
+    res.json(matchingResult);
+  } catch (error) {
+    console.error('Error running matching:', error);
+    res.status(500).json({ error: 'Failed to run matching' });
+  }
+});
+
+// 특정 유저 상세 프로필 조회
+app.get('/api/matching/user/:userId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { userId } = req.params;
+    const userProfile = await matchingService.getUserDetailedProfile(userId);
+    res.json(userProfile);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
