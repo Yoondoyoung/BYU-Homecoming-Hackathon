@@ -79,9 +79,13 @@ export default function SpotChat({ socket, currentSpot, nickname, onClose, isSid
               </div>
             ) : (
               <div className={`spot-user-message ${m.user === nickname ? 'own' : 'other'}`}>
-                {m.user !== nickname && <span className="spot-user-name">{m.user}</span>}
+                <div className="spot-user-meta">
+                  <span className="spot-user-name">
+                    {m.user === nickname ? 'You' : m.user || 'Anonymous'}
+                  </span>
+                  <span className="spot-message-time">{m.time}</span>
+                </div>
                 <div className="spot-message-content">{m.message}</div>
-                <span className="spot-message-time">({m.time})</span>
               </div>
             )}
           </div>
