@@ -21,6 +21,7 @@ const authRoutes = require('./routes/auth');
 const voteRoutes = require('./routes/votes');
 const { supabase } = require('./config/supabase');
 const UserMatchingService = require('./services/UserMatchingService');
+const ConversationTopicService = require('./services/ConversationTopicService');
 
 // Middleware
 app.use(cors({
@@ -197,6 +198,7 @@ app.use('/api/votes', voteRoutes);
 
 // Matching API endpoints
 const matchingService = new UserMatchingService();
+const conversationService = new ConversationTopicService();
 
 // 매칭된 유저들 조회
 app.get('/api/matching/matched-users', async (req, res) => {
@@ -265,6 +267,87 @@ app.get('/api/matching/user/:userId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+// 대화 주제 생성
+app.post('/api/conversation/topics', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { targetUserId, currentUserProfile } = req.body;
+    
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID is required' });
+    }
+
+    // 대상 사용자 프로필 조회
+    const targetUserProfile = await matchingService.getUserDetailedProfile(targetUserId);
+    if (!targetUserProfile.success) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    // 대화 주제 생성
+    const conversationTopics = await conversationService.generateConversationTopics(
+      targetUserProfile.profile,
+      currentUserProfile
+    );
+
+    res.json(conversationTopics);
+  } catch (error) {
+    console.error('Error generating conversation topics:', error);
+    res.status(500).json({ error: 'Failed to generate conversation topics' });
+  }
+});
+
+// 특정 카테고리별 대화 주제 생성
+app.post('/api/conversation/topics/:category', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No authorization token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const { category } = req.params;
+    const { targetUserId } = req.body;
+    
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID is required' });
+    }
+
+    // 대상 사용자 프로필 조회
+    const targetUserProfile = await matchingService.getUserDetailedProfile(targetUserId);
+    if (!targetUserProfile.success) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    // 카테고리별 대화 주제 생성
+    const categoryTopics = await conversationService.generateCategoryTopics(
+      targetUserProfile.profile,
+      category
+    );
+
+    res.json(categoryTopics);
+  } catch (error) {
+    console.error('Error generating category topics:', error);
+    res.status(500).json({ error: 'Failed to generate category topics' });
   }
 });
 
