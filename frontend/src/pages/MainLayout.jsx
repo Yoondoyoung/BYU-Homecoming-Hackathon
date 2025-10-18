@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CommonHeader from '../components/CommonHeader.jsx';
 import MapBox from '../components/mapbox.jsx';
 import MatchingPage from './MatchingPage.jsx';
 import LeaderboardPage from './LeaderboardPage.jsx';
 import ProfilePage from './ProfilePage.jsx';
 import SpotChat from '../components/SpotChat.jsx';
+import DirectChat from '../components/DirectChat.jsx';
 import io from 'socket.io-client';
 import '../styles/MainLayout.css';
 import '../styles/MapPage.css';
@@ -16,6 +17,11 @@ function MainLayout() {
   const [nickname, setNickname] = useState('Anonymous');
   const [currentSpot, setCurrentSpot] = useState(null);
   const [isSpotChatOpen, setIsSpotChatOpen] = useState(false);
+  const [isDirectChatOpen, setIsDirectChatOpen] = useState(false);
+  const [directChatPartner, setDirectChatPartner] = useState(null);
+  const [isDirectChatInitiator, setIsDirectChatInitiator] = useState(false);
+  const [directConversationId, setDirectConversationId] = useState(null);
+  const [unreadDirectByUser, setUnreadDirectByUser] = useState({});
 
   useEffect(() => {
     // localStorage에서 사용자 정보 가져오기
@@ -46,12 +52,51 @@ function MainLayout() {
     }
 
     setNickname(nicknameToUse);
-    newSocket.emit('setNickname', nicknameToUse);
 
     return () => {
       newSocket.emit('leaveSpotChat');
       newSocket.close();
     };
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+    const payload = user?.id
+      ? {
+          nickname,
+          userId: user.id,
+          profileImage: user.profile_image_url
+        }
+      : { nickname };
+    socket.emit('setNickname', payload);
+  }, [socket, nickname, user?.id, user?.profile_image_url]);
+
+  useEffect(() => {
+    if (user?.nickname) {
+      setNickname(user.nickname);
+    }
+  }, [user?.nickname]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setUnreadDirectByUser({});
+    }
+  }, [user?.id]);
+
+  const computeConversationId = useCallback((idA, idB) => {
+    if (!idA || !idB) return null;
+    const [first, second] = [String(idA), String(idB)].sort();
+    return `${first}-${second}`;
+  }, []);
+
+  const markConversationAsRead = useCallback((partnerId) => {
+    if (!partnerId) return;
+    setUnreadDirectByUser((prev) => {
+      if (!prev || !prev[partnerId]) return prev;
+      const updated = { ...prev };
+      delete updated[partnerId];
+      return updated;
+    });
   }, []);
 
   const handlePageChange = (page) => {
@@ -108,6 +153,143 @@ function MainLayout() {
     }
     setIsSpotChatOpen(false);
   };
+
+  const openDirectChat = useCallback(
+    (partner, { initiator = false, conversationId } = {}) => {
+      if (!partner || !user?.id || !socket) return;
+      const finalConversationId = conversationId || computeConversationId(user.id, partner.id);
+      if (!finalConversationId) return;
+
+      setDirectChatPartner(partner);
+      setDirectConversationId(finalConversationId);
+      setIsDirectChatInitiator(initiator);
+      setIsDirectChatOpen(true);
+      markConversationAsRead(partner.id);
+    },
+    [user?.id, socket, computeConversationId, markConversationAsRead]
+  );
+
+  const handleStartDirectChat = useCallback(
+    (partner) => {
+      if (!partner) return;
+      markConversationAsRead(partner.id);
+      openDirectChat(partner, { initiator: true });
+    },
+    [openDirectChat, markConversationAsRead]
+  );
+
+  const handleCloseDirectChat = useCallback(() => {
+    if (directChatPartner?.id) {
+      markConversationAsRead(directChatPartner.id);
+    }
+    setIsDirectChatOpen(false);
+    setDirectChatPartner(null);
+    setDirectConversationId(null);
+    setIsDirectChatInitiator(false);
+  }, [directChatPartner, markConversationAsRead]);
+
+  useEffect(() => {
+    if (!socket || !user?.id) return;
+
+    const addUnreadEntry = (fromUser, payload = {}) => {
+      if (!fromUser?.id) return;
+      const partnerId = fromUser.id;
+
+      setUnreadDirectByUser((prev) => {
+        const prevEntry = prev?.[partnerId];
+        const updatedEntry = {
+          ...prevEntry,
+          ...payload,
+          fromUser,
+          conversationId: payload.conversationId || prevEntry?.conversationId || computeConversationId(user.id, partnerId),
+          unreadCount: (prevEntry?.unreadCount || 0) + 1
+        };
+
+        return {
+          ...prev,
+          [partnerId]: updatedEntry
+        };
+      });
+    };
+
+    const handleDirectChatInvite = (payload) => {
+      if (!payload?.conversationId || !payload?.fromUser) return;
+      if (payload.toUserId && String(payload.toUserId) !== String(user.id)) return;
+
+      const partner = {
+        id: payload.fromUser.id,
+        nickname: payload.fromUser.nickname || payload.fromUser.name || 'Friend',
+        profile_image_url: payload.fromUser.profile_image_url || null,
+        major: payload.fromUser.major || null,
+        hobby: payload.fromUser.hobby || null
+      };
+
+      const conversationId = payload.conversationId || computeConversationId(payload.fromUser.id, user.id);
+      const isCurrentChatOpen =
+        isDirectChatOpen &&
+        directChatPartner &&
+        String(directChatPartner.id) === String(partner.id);
+
+      if (!isCurrentChatOpen) {
+        addUnreadEntry(partner, {
+          conversationId,
+          message:
+            payload.metadata?.preview || `${partner.nickname || 'Friend'} started a chat with you`,
+          time: payload.createdAt,
+          isInvite: true
+        });
+      } else {
+        openDirectChat(partner, { initiator: false, conversationId });
+      }
+    };
+
+    const handleDirectMessageNotification = (payload) => {
+      if (!payload?.conversationId || !payload?.fromUser) return;
+      if (payload.isSelf) {
+        // ignore notifications originated from this user (other devices may still need)
+        return;
+      }
+
+      const partnerId = payload.fromUser.id;
+      const isCurrentChatOpen =
+        isDirectChatOpen &&
+        directChatPartner &&
+        String(directChatPartner.id) === String(partnerId);
+
+      if (isCurrentChatOpen) {
+        markConversationAsRead(partnerId);
+        return;
+      }
+
+      addUnreadEntry(payload.fromUser, {
+        conversationId: payload.conversationId,
+        message: payload.message,
+        time: payload.time,
+        isInvite: false
+      });
+    };
+
+    socket.on('directChatInvite', handleDirectChatInvite);
+    socket.on('directMessageNotification', handleDirectMessageNotification);
+    return () => {
+      socket.off('directChatInvite', handleDirectChatInvite);
+      socket.off('directMessageNotification', handleDirectMessageNotification);
+    };
+  }, [
+    socket,
+    user?.id,
+    computeConversationId,
+    openDirectChat,
+    isDirectChatOpen,
+    directChatPartner,
+    markConversationAsRead
+  ]);
+
+  useEffect(() => {
+    if (isDirectChatOpen && directChatPartner?.id) {
+      markConversationAsRead(directChatPartner.id);
+    }
+  }, [isDirectChatOpen, directChatPartner, markConversationAsRead]);
 
   return (
     <div className="main-layout">
@@ -178,7 +360,10 @@ function MainLayout() {
         )}
         
         {currentPage === 'matching' && (
-          <MatchingPage />
+          <MatchingPage 
+            onStartChat={handleStartDirectChat}
+            unreadMap={unreadDirectByUser}
+          />
         )}
         
         {currentPage === 'leaderboard' && (
@@ -189,6 +374,23 @@ function MainLayout() {
           <ProfilePage onUserUpdate={handleUserUpdate} />
         )}
       </div>
+
+      <DirectChat
+        socket={socket}
+        currentUser={
+          user
+            ? {
+                ...user,
+                nickname: nickname || user.nickname || 'You'
+              }
+            : null
+        }
+        targetUser={directChatPartner}
+        conversationId={directConversationId}
+        isOpen={isDirectChatOpen}
+        isInitiator={isDirectChatInitiator}
+        onClose={handleCloseDirectChat}
+      />
     </div>
   );
 }

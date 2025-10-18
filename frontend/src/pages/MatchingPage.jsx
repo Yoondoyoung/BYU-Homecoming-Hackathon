@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/MatchingPage.css';
 
-function MatchingPage() {
+function MatchingPage({ onStartChat, unreadMap = {} }) {
   const [matchedUsers, setMatchedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -87,6 +87,14 @@ function MatchingPage() {
     setSelectedUser(null);
   };
 
+  const handleStartChat = (user) => {
+    if (user && typeof onStartChat === 'function') {
+      onStartChat(user);
+    }
+    setShowUserModal(false);
+    setSelectedUser(null);
+  };
+
   useEffect(() => {
     fetchMatchedUsers();
   }, []);
@@ -149,34 +157,54 @@ function MatchingPage() {
             <div className="matched-users-container">
               <div className="users-scroll-container">
                 <div className="users-horizontal-scroll">
-                  {matchedUsers.map((user) => (
-                    <div 
-                      key={user.id} 
-                      className="user-card"
-                      onClick={() => handleUserClick(user)}
-                    >
-                      <div className="profile-image-container">
-                        {user.profile_image_url ? (
-                          <img 
-                            src={user.profile_image_url} 
-                            alt={user.nickname}
-                            className="profile-image"
-                          />
-                        ) : (
-                          <div className="default-profile-image">
-                            {user.nickname ? user.nickname.charAt(0).toUpperCase() : '?'}
+                  {matchedUsers.map((user) => {
+                    const unreadEntry = unreadMap[user.id];
+                    const hasUnread = !!unreadEntry;
+                    const unreadMessage = unreadEntry?.message;
+                    const unreadTime = unreadEntry?.time;
+                    const unreadCount = unreadEntry?.unreadCount || 0;
+
+                    return (
+                      <div 
+                        key={user.id} 
+                        className={`user-card ${hasUnread ? 'has-unread' : ''}`}
+                        onClick={() => handleUserClick(user)}
+                      >
+                        <div className="profile-image-container">
+                          {user.profile_image_url ? (
+                            <img 
+                              src={user.profile_image_url} 
+                              alt={user.nickname}
+                              className="profile-image"
+                            />
+                          ) : (
+                            <div className="default-profile-image">
+                              {user.nickname ? user.nickname.charAt(0).toUpperCase() : '?'}
+                            </div>
+                          )}
+                          <div className="similarity-badge">
+                            {user.similarity_score}%
                           </div>
-                        )}
-                        <div className="similarity-badge">
-                          {user.similarity_score}%
+                          {hasUnread && (
+                            <span className="unread-dot" aria-label="Unread message">
+                              {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                          )}
+                        </div>
+                        <div className="user-info">
+                          <h4 className="user-nickname">{user.nickname || 'Anonymous'}</h4>
+                          <p className="user-major">{user.major || 'Major not specified'}</p>
+                          {hasUnread && (
+                            <div className="unread-preview">
+                              <span className="unread-label">New message</span>
+                              {unreadMessage && <span className="unread-text">{unreadMessage}</span>}
+                              {unreadTime && <span className="unread-time">{unreadTime}</span>}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="user-info">
-                        <h4 className="user-nickname">{user.nickname || 'Anonymous'}</h4>
-                        <p className="user-major">{user.major || 'Major not specified'}</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -254,7 +282,10 @@ function MatchingPage() {
         </div>
         
             <div className="modal-footer">
-              <button className="start-chat-button" onClick={() => console.log('Start chat:', selectedUser.nickname)}>
+              <button
+                className="start-chat-button"
+                onClick={() => handleStartChat(selectedUser)}
+              >
                 💬 Start Chat
               </button>
             </div>

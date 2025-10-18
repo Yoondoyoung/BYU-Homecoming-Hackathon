@@ -1,5 +1,9 @@
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+const path = require('path');
+
+require('dotenv').config({
+  path: path.resolve(__dirname, '..', '.env')
+});
 
 // Supabase 클라이언트 생성
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -36,4 +40,3 @@ const supabaseAdmin = createClient(
 );
 
 module.exports = { supabase, supabaseAdmin };
-
