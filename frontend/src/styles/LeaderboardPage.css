@@ -30,6 +30,22 @@
   color: #2d3e1f;
 }
 
+.weekly-subject {
+  margin: 20px 0;
+  padding: 15px 20px;
+  background: #C8E0A8;
+  border-radius: 10px;
+  border: 1px solid #A8C97F;
+  text-align: center;
+}
+
+.weekly-subject h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #2d3e1f;
+  font-weight: 600;
+}
+
 .week-range {
   color: #4a5d36;
   font-size: 0.9em;
@@ -40,6 +56,60 @@
   color: #6B8E3D;
   font-size: 0.85em;
   margin-top: 10px;
+}
+
+.building-colors-status {
+  margin-top: 30px;
+  padding: 20px;
+  background: #A8C97F;
+  border-radius: 12px;
+  border: 1px solid #9BC063;
+}
+
+.building-colors-status h3 {
+  color: #2d3e1f;
+  font-size: 1.2rem;
+  margin: 0 0 15px 0;
+  text-align: center;
+}
+
+.color-stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 15px;
+}
+
+.color-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+}
+
+.color-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #2d3e1f;
+}
+
+.color-indicator.light-blue {
+  background-color: #60A5FA;
+}
+
+.color-indicator.coral-orange {
+  background-color: #FB923C;
+}
+
+.color-indicator.warm-gray {
+  background-color: #9CA3AF;
+}
+
+.color-stat span {
+  color: #2d3e1f;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .loading-container {

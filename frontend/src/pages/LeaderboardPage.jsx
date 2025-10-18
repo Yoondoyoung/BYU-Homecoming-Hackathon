@@ -7,11 +7,20 @@ const LeaderboardPage = () => {
   const [error, setError] = useState(null);
   const [weekStart, setWeekStart] = useState(null);
   const [weekEnd, setWeekEnd] = useState(null);
+  const [buildingColors, setBuildingColors] = useState({
+    lightBlue: 0,
+    coralOrange: 0,
+    warmGray: 0
+  });
 
   useEffect(() => {
     fetchLeaderboard();
+    fetchBuildingColors();
     // Refresh every 30 seconds
-    const interval = setInterval(fetchLeaderboard, 30000);
+    const interval = setInterval(() => {
+      fetchLeaderboard();
+      fetchBuildingColors();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -34,6 +43,55 @@ const LeaderboardPage = () => {
       setError('Failed to load leaderboard. Please try again later.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBuildingColors = async () => {
+    try {
+      // Fetch all active buildings
+      const buildingsRes = await fetch('http://localhost:4001/api/buildings');
+      if (!buildingsRes.ok) {
+        throw new Error('Failed to fetch buildings');
+      }
+      const buildings = await buildingsRes.json();
+
+      // Fetch aggregated votes per building
+      const votesRes = await fetch('http://localhost:4001/api/votes/all');
+      if (!votesRes.ok) {
+        throw new Error('Failed to fetch building colors');
+      }
+      const votesData = await votesRes.json();
+      const buildingVotes = votesData.buildingVotes || {};
+
+      let lightBlueCount = 0;
+      let coralOrangeCount = 0;
+      let warmGrayCount = 0;
+
+      // Count color per building, defaulting to 0 when not present
+      buildings.forEach((b) => {
+        const votes = buildingVotes[b.id] || { option_a: 0, option_b: 0 };
+        const optionA = votes.option_a || 0;
+        const optionB = votes.option_b || 0;
+        const total = optionA + optionB;
+
+        if (total === 0) {
+          warmGrayCount++; // No votes - warm gray
+        } else if (optionA === optionB) {
+          warmGrayCount++; // Tie - warm gray
+        } else if (optionA > optionB) {
+          lightBlueCount++; // Option A winning - light blue
+        } else {
+          coralOrangeCount++; // Option B winning - coral orange
+        }
+      });
+
+      setBuildingColors({
+        lightBlue: lightBlueCount,
+        coralOrange: coralOrangeCount,
+        warmGray: warmGrayCount
+      });
+    } catch (err) {
+      console.error('Error fetching building colors:', err);
     }
   };
 
@@ -68,6 +126,9 @@ const LeaderboardPage = () => {
       <div className="leaderboard-container">
         <div className="leaderboard-header">
           <h1>🏆 Weekly Leaderboard</h1>
+          <div className="weekly-subject">
+            <h2>📋 Weekly Subject: Do you like MintChocolate?</h2>
+          </div>
           {weekStart && weekEnd && (
             <p className="week-range">
               Week of {formatDate(weekStart)} - {formatDate(weekEnd)}
@@ -76,6 +137,24 @@ const LeaderboardPage = () => {
           <p className="leaderboard-description">
             Top voters of the week! Keep voting to climb the ranks.
           </p>
+          
+          <div className="building-colors-status">
+            <h3>🎨 Building Colors Status</h3>
+            <div className="color-stats">
+              <div className="color-stat">
+                <div className="color-indicator light-blue"></div>
+                <span>Like Leading: {buildingColors.lightBlue}</span>
+              </div>
+              <div className="color-stat">
+                <div className="color-indicator coral-orange"></div>
+                <span>Dislike Leading: {buildingColors.coralOrange}</span>
+              </div>
+              <div className="color-stat">
+                <div className="color-indicator warm-gray"></div>
+                <span>Tie/No Votes: {buildingColors.warmGray}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {error && (
