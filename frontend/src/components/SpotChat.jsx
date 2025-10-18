@@ -4,6 +4,7 @@ import "./SpotChat.css";
 export default function SpotChat({ socket, currentSpot, nickname, onClose }) {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  const [userCount, setUserCount] = useState(1);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -24,10 +25,19 @@ export default function SpotChat({ socket, currentSpot, nickname, onClose }) {
       }
     };
 
+    const handleUserCountUpdate = (data) => {
+      // Only update count for current spot
+      if (data.spotId === currentSpot?.id) {
+        setUserCount(data.userCount);
+      }
+    };
+
     socket.on("chatMessage", handleChatMessage);
+    socket.on("userCountUpdate", handleUserCountUpdate);
 
     return () => {
       socket.off("chatMessage", handleChatMessage);
+      socket.off("userCountUpdate", handleUserCountUpdate);
     };
   }, [socket, currentSpot]);
 
@@ -52,7 +62,7 @@ export default function SpotChat({ socket, currentSpot, nickname, onClose }) {
       <div className="spot-chat-container">
         <div className="spot-chat-header">
           <div className="spot-info">
-            <h3>💬 {currentSpot.name}</h3>
+            <h3>💬 {currentSpot.name} ({userCount})</h3>
             <p>Chat with people at this location</p>
           </div>
           <button className="close-button" onClick={onClose}>
