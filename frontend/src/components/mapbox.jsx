@@ -424,6 +424,7 @@ export default function MapBox() {
         <VoteComponent
           buildingId={selectedBuilding.id}
           buildingName={selectedBuilding.name}
+          userLocation={userLocation}
           onClose={() => setSelectedBuilding(null)}
         />
       )}
