@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import io from "socket.io-client";
 import SpotChat from "./SpotChat.jsx";
 import VoteComponent from "./VoteComponent.jsx";
@@ -94,7 +95,7 @@ export default function MapBox() {
     const safelyAddLayers = () => {
       if (!map.current?.isStyleLoaded()) {
         console.warn("⏳ Waiting for style...");
-        setTimeout(safelyAddLayers, 200);
+        setTimeout(safelyAddLayers, 300);
         return;
       }
 
@@ -296,82 +297,98 @@ export default function MapBox() {
     });
   };
 
-  // Update user location using MapBox's built-in user location (most stable)
+  // ✅ Update user location safely after style is loaded
   useEffect(() => {
     if (!map.current || !userLocation) return;
 
-    console.log("🗺️ Updating user location on map:", userLocation);
+    const updateUserLocation = () => {
+      // 🔹 스타일 준비 안됐으면 재시도
+      if (!map.current.isStyleLoaded()) {
+        console.warn(
+          "🕓 Waiting for map style to finish loading before updating user location..."
+        );
+        setTimeout(updateUserLocation, 300);
+        return;
+      }
 
-    // Remove existing custom user location source and layers
-    if (map.current.getSource("user-location")) {
-      map.current.removeLayer("user-location-pulse");
-      map.current.removeLayer("user-location-dot");
-      map.current.removeSource("user-location");
-    }
+      console.log("🗺️ Updating user location on map:", userLocation);
 
-    // Create GeoJSON data for user location
-    const userLocationGeoJSON = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "Point",
-            coordinates: [userLocation.lng, userLocation.lat],
+      // 🔹 기존 user-location 제거
+      if (map.current.getSource("user-location")) {
+        if (map.current.getLayer("user-location-pulse"))
+          map.current.removeLayer("user-location-pulse");
+        if (map.current.getLayer("user-location-dot"))
+          map.current.removeLayer("user-location-dot");
+        map.current.removeSource("user-location");
+      }
+
+      // 🔹 새 GeoJSON 생성
+      const userLocationGeoJSON = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: [userLocation.lng, userLocation.lat],
+            },
+            properties: {
+              id: "user-location",
+            },
           },
-          properties: {
-            id: "user-location",
+        ],
+      };
+
+      // ✅ Source 추가
+      map.current.addSource("user-location", {
+        type: "geojson",
+        data: userLocationGeoJSON,
+      });
+
+      // ✅ Pulse ring layer 추가
+      map.current.addLayer({
+        id: "user-location-pulse",
+        type: "circle",
+        source: "user-location",
+        paint: {
+          "circle-radius": {
+            base: 1.75,
+            stops: [
+              [12, 15],
+              [22, 120],
+            ],
           },
+          "circle-color": "#2563eb",
+          "circle-opacity": 0.2,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#2563eb",
+          "circle-stroke-opacity": 0.4,
         },
-      ],
+      });
+
+      // ✅ Center dot layer 추가
+      map.current.addLayer({
+        id: "user-location-dot",
+        type: "circle",
+        source: "user-location",
+        paint: {
+          "circle-radius": {
+            base: 1.75,
+            stops: [
+              [12, 6],
+              [22, 10],
+            ],
+          },
+          "circle-color": "#2563eb",
+          "circle-stroke-width": 3,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-opacity": 1,
+        },
+      });
     };
 
-    // Add user location source
-    map.current.addSource("user-location", {
-      type: "geojson",
-      data: userLocationGeoJSON,
-    });
-
-    // Add pulse ring layer (scales with zoom)
-    map.current.addLayer({
-      id: "user-location-pulse",
-      type: "circle",
-      source: "user-location",
-      paint: {
-        "circle-radius": {
-          base: 1.75,
-          stops: [
-            [12, 15],
-            [22, 120],
-          ],
-        },
-        "circle-color": "#2563eb",
-        "circle-opacity": 0.2,
-        "circle-stroke-width": 2,
-        "circle-stroke-color": "#2563eb",
-        "circle-stroke-opacity": 0.4,
-      },
-    });
-
-    // Add center dot layer (scales with zoom)
-    map.current.addLayer({
-      id: "user-location-dot",
-      type: "circle",
-      source: "user-location",
-      paint: {
-        "circle-radius": {
-          base: 1.75,
-          stops: [
-            [12, 6],
-            [22, 10],
-          ],
-        },
-        "circle-color": "#2563eb",
-        "circle-stroke-width": 3,
-        "circle-stroke-color": "#ffffff",
-        "circle-stroke-opacity": 1,
-      },
-    });
+    // 실행
+    updateUserLocation();
   }, [userLocation]);
 
   // Spot entry detection with automatic chat joining
