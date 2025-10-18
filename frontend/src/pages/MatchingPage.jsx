@@ -1,5 +1,5 @@
 import React from 'react';
-import './MatchingPage.css';
+import '../styles/MatchingPage.css';
 
 function MatchingPage() {
   return (

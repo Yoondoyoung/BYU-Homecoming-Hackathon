@@ -135,14 +135,13 @@ export default function MapBox() {
     return () => newSocket.close();
   }, []);
 
-  // Join spot chat when entering a spot
+  // Join spot chat when user manually opens chat
   const joinSpotChat = (spot) => {
     if (socket && nickname) {
       socket.emit('joinSpotChat', {
         spotId: spot.id,
         spotName: spot.name
       });
-      setCurrentSpot(spot);
       setShowSpotChat(true);
       console.log(`📍 Joined ${spot.name} chat room`);
     }
@@ -378,9 +377,10 @@ export default function MapBox() {
       }
     });
     
-    // Auto-join spot chat if entered a new spot
+    // Update current spot without auto-opening chat
     if (enteredSpot && (!currentSpot || currentSpot.id !== enteredSpot.id)) {
-      joinSpotChat(enteredSpot);
+      setCurrentSpot(enteredSpot);
+      console.log(`📍 Entered ${enteredSpot.name} - Chat available`);
     }
     
     // Auto-leave spot chat if not in any spot
@@ -413,7 +413,13 @@ export default function MapBox() {
             </span>
             <button 
               className="spot-chat-toggle"
-              onClick={() => setShowSpotChat(!showSpotChat)}
+              onClick={() => {
+                if (!showSpotChat) {
+                  joinSpotChat(currentSpot);
+                } else {
+                  setShowSpotChat(false);
+                }
+              }}
             >
               💬
             </button>

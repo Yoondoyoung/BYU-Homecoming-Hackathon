@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './CommonHeader.css';
+import '../styles/CommonHeader.css';
 
 function CommonHeader({ currentPage, onPageChange }) {
   const [user, setUser] = useState(null);
@@ -71,6 +71,12 @@ function CommonHeader({ currentPage, onPageChange }) {
               onClick={() => onPageChange('map')}
             >
               Map
+            </button>
+            <button 
+              className={`page-button ${currentPage === 'chat' ? 'active' : ''}`}
+              onClick={() => onPageChange('chat')}
+            >
+              Chat
             </button>
             <button 
               className={`page-button ${currentPage === 'matching' ? 'active' : ''}`}

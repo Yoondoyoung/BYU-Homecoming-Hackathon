@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import CommonHeader from '../components/CommonHeader';
-import MapBox from '../components/mapbox';
-import MatchingPage from './MatchingPage';
-import ProfilePage from './ProfilePage';
-import './MainLayout.css';
+import CommonHeader from '../components/CommonHeader.jsx';
+import MapBox from '../components/mapbox.jsx';
+import ChatPage from './ChatPage.jsx';
+import MatchingPage from './MatchingPage.jsx';
+import ProfilePage from './ProfilePage.jsx';
+import '../styles/MainLayout.css';
 
 function MainLayout() {
   const [currentPage, setCurrentPage] = useState('map');
@@ -24,6 +25,10 @@ function MainLayout() {
           <div className="map-content">
             <MapBox />
           </div>
+        )}
+        
+        {currentPage === 'chat' && (
+          <ChatPage />
         )}
         
         {currentPage === 'matching' && (
