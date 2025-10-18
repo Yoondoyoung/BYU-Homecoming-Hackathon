@@ -99,7 +99,7 @@ router.post('/register', async (req, res) => {
       const { data: existingUser, error: checkError } = await supabaseAdmin.auth.admin.listUsers({
         page: 1,
         perPage: 1000, // 충분히 큰 수로 설정
-        filter: `email.eq.${email}`
+        filter: `email.eq.${encodeURIComponent(email)}`
       });
       
       console.log('Existing user check result:', { existingUser, checkError });
