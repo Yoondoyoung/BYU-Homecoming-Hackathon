@@ -441,5 +441,93 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
-module.exports = router;
+// 프로필 업데이트
+router.put('/profile', authenticateToken, async (req, res) => {
+  try {
+    const { nickname } = req.body;
+    const userId = req.user.id;
+    const accessToken = req.headers['authorization']?.split(' ')[1];
+    
+    console.log('Profile update request:', { userId, nickname, user: req.user });
 
+    // 닉네임 길이 검증
+    if (nickname && (nickname.length < 2 || nickname.length > 20)) {
+      return res.status(400).json({ 
+        error: 'Invalid nickname',
+        message: 'Nickname must be between 2 and 20 characters.' 
+      });
+    }
+
+    // 사용자 토큰으로 Supabase 클라이언트 생성
+    const { createClient } = require('@supabase/supabase-js');
+    const userSupabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        }
+      }
+    );
+
+    // Supabase에서 사용자 메타데이터 업데이트
+    const { data, error } = await userSupabase.auth.updateUser({
+      data: {
+        nickname: nickname
+      }
+    });
+
+    if (error) {
+      console.error('Supabase update error:', error);
+      return res.status(400).json({ 
+        error: error.message,
+        message: 'Failed to update profile.' 
+      });
+    }
+
+    res.json({
+      message: 'Profile updated successfully.',
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+        email_confirmed: data.user.email_confirmed_at !== null,
+        name: data.user.user_metadata?.name,
+        nickname: data.user.user_metadata?.nickname,
+        school: data.user.user_metadata?.school
+      }
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({ 
+      error: 'Profile update failed',
+      message: 'An error occurred while updating profile.' 
+    });
+  }
+});
+
+// Supabase 연결 테스트
+router.get('/test-supabase', async (req, res) => {
+  try {
+    console.log('Testing Supabase connection...');
+    console.log('Supabase URL:', process.env.SUPABASE_URL);
+    console.log('Service Key exists:', !!process.env.SUPABASE_SERVICE_KEY);
+    
+    // 간단한 테스트
+    const { data, error } = await supabase.auth.getSession();
+    console.log('Supabase test result:', { data, error });
+    
+    res.json({
+      message: 'Supabase connection test',
+      url: process.env.SUPABASE_URL,
+      hasServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
+      testResult: { data, error }
+    });
+  } catch (error) {
+    console.error('Supabase test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+module.exports = router;
