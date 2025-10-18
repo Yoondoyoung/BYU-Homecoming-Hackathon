@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import io from "socket.io-client";
+import SpotChat from "./SpotChat";
 import "./mapbox.css";
 
 mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_TOKEN;
@@ -9,8 +11,12 @@ export default function MapBox() {
   const map = useRef(null);
   const userMarkerRef = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [currentSpot, setCurrentSpot] = useState(null);
+  const [socket, setSocket] = useState(null);
+  const [nickname, setNickname] = useState('');
+  const [showSpotChat, setShowSpotChat] = useState(false);
 
-  // Spot 데이터 (BYU 캠퍼스 예시)
+  // Spot data (BYU campus example)
   const [spots] = useState([
     {
       id: 1,
@@ -86,7 +92,7 @@ export default function MapBox() {
     },
   ]);
 
-  // 거리 계산 함수 (Haversine)
+  // Distance calculation function (Haversine)
   const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371000; // meters
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -97,6 +103,62 @@ export default function MapBox() {
         Math.cos((lat2 * Math.PI) / 180) *
         Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    const newSocket = io("http://localhost:4001");
+    setSocket(newSocket);
+
+    // Get nickname from user profile
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        const userNickname = user.nickname || user.name || 'Anonymous';
+        setNickname(userNickname);
+        newSocket.emit('setNickname', userNickname);
+        console.log(`🎭 Using profile nickname: ${userNickname}`);
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        setNickname('Anonymous');
+        newSocket.emit('setNickname', 'Anonymous');
+      }
+    } else {
+      // Fallback if no user data
+      setNickname('Anonymous');
+      newSocket.emit('setNickname', 'Anonymous');
+    }
+
+    return () => newSocket.close();
+  }, []);
+
+  // Join spot chat when entering a spot
+  const joinSpotChat = (spot) => {
+    if (socket && nickname) {
+      socket.emit('joinSpotChat', {
+        spotId: spot.id,
+        spotName: spot.name
+      });
+      setCurrentSpot(spot);
+      setShowSpotChat(true);
+      console.log(`📍 Joined ${spot.name} chat room`);
+    }
+  };
+
+  // Leave spot chat when exiting a spot
+  const leaveSpotChat = () => {
+    if (socket && currentSpot) {
+      socket.emit('leaveSpotChat');
+      setCurrentSpot(null);
+      setShowSpotChat(false);
+      console.log(`📍 Left ${currentSpot.name} chat room`);
+    }
+  };
+
+  // Close spot chat manually
+  const closeSpotChat = () => {
+    setShowSpotChat(false);
   };
 
   // 위도/경도 중심 + 반경(m) → 원형 polygon 생성
@@ -132,12 +194,16 @@ export default function MapBox() {
     });
 
     map.current.addControl(new mapboxgl.NavigationControl());
-    map.current.addControl(
-      new mapboxgl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: true,
-      })
-    );
+    
+    // Add geolocate control with custom styling
+    const geolocate = new mapboxgl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserHeading: true,
+      showAccuracyCircle: false, // We'll create our own pulse effect
+    });
+    
+    map.current.addControl(geolocate);
 
     map.current.on("load", () => {
       addSpotLayers();
@@ -221,29 +287,81 @@ export default function MapBox() {
     });
   };
 
-  // 유저 마커 갱신
+  // Update user location using MapBox's built-in user location (most stable)
   useEffect(() => {
     if (!map.current || !userLocation) return;
 
-    if (userMarkerRef.current) userMarkerRef.current.remove();
+    // Remove existing custom user location source and layers
+    if (map.current.getSource('user-location')) {
+      map.current.removeLayer('user-location-pulse');
+      map.current.removeLayer('user-location-dot');
+      map.current.removeSource('user-location');
+    }
 
-    const el = document.createElement("div");
-    el.className = "user-marker";
-    el.style.backgroundColor = "#2563eb";
-    el.style.width = "24px";
-    el.style.height = "24px";
-    el.style.borderRadius = "50%";
-    el.style.border = "3px solid white";
-    el.style.boxShadow = "0 2px 6px rgba(0,0,0,0.4)";
+    // Create GeoJSON data for user location
+    const userLocationGeoJSON = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [userLocation.lng, userLocation.lat]
+        },
+        properties: {
+          id: 'user-location'
+        }
+      }]
+    };
 
-    userMarkerRef.current = new mapboxgl.Marker(el)
-      .setLngLat([userLocation.lng, userLocation.lat])
-      .addTo(map.current);
+    // Add user location source
+    map.current.addSource('user-location', {
+      type: 'geojson',
+      data: userLocationGeoJSON
+    });
+
+    // Add pulse ring layer (scales with zoom)
+    map.current.addLayer({
+      id: 'user-location-pulse',
+      type: 'circle',
+      source: 'user-location',
+      paint: {
+        'circle-radius': {
+          'base': 1.75,
+          'stops': [[12, 15], [22, 120]]
+        },
+        'circle-color': '#2563eb',
+        'circle-opacity': 0.2,
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#2563eb',
+        'circle-stroke-opacity': 0.4
+      }
+    });
+
+    // Add center dot layer (scales with zoom)
+    map.current.addLayer({
+      id: 'user-location-dot',
+      type: 'circle',
+      source: 'user-location',
+      paint: {
+        'circle-radius': {
+          'base': 1.75,
+          'stops': [[12, 6], [22, 10]]
+        },
+        'circle-color': '#2563eb',
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-opacity': 1
+      }
+    });
+
   }, [userLocation]);
 
-  // Spot 진입 감지
+  // Spot entry detection with automatic chat joining
   useEffect(() => {
-    if (!userLocation) return;
+    if (!userLocation || !socket) return;
+    
+    let enteredSpot = null;
+    
     spots.forEach((spot) => {
       const dist = getDistance(
         userLocation.lat,
@@ -251,15 +369,55 @@ export default function MapBox() {
         spot.lat,
         spot.lng
       );
+      
       if (dist < spot.radius) {
-        console.log(`✅ ${spot.name} 진입 감지 (거리: ${dist.toFixed(1)}m)`);
+        enteredSpot = spot;
+        console.log(`✅ ${spot.name} entry detected (distance: ${dist.toFixed(1)}m)`);
       }
     });
-  }, [userLocation]);
+    
+    // Auto-join spot chat if entered a new spot
+    if (enteredSpot && (!currentSpot || currentSpot.id !== enteredSpot.id)) {
+      joinSpotChat(enteredSpot);
+    }
+    
+    // Auto-leave spot chat if not in any spot
+    if (!enteredSpot && currentSpot) {
+      leaveSpotChat();
+    }
+  }, [userLocation, socket, currentSpot]);
 
   return (
     <div className="map-wrapper">
       <div ref={mapContainer} className="map-container-inner" />
+      
+      {/* Spot Chat Overlay */}
+      {showSpotChat && currentSpot && (
+        <SpotChat
+          socket={socket}
+          currentSpot={currentSpot}
+          nickname={nickname}
+          onClose={closeSpotChat}
+        />
+      )}
+      
+      {/* Current Spot Indicator */}
+      {currentSpot && (
+        <div className="current-spot-indicator">
+          <div className="spot-indicator-content">
+            <span className="spot-indicator-icon">📍</span>
+            <span className="spot-indicator-text">
+              You're at {currentSpot.name}
+            </span>
+            <button 
+              className="spot-chat-toggle"
+              onClick={() => setShowSpotChat(!showSpotChat)}
+            >
+              💬
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
