@@ -1,0 +1,80 @@
+.custom-tooltip {
+  position: absolute;
+  background: white;
+  border: 2px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 200px;
+  max-width: 250px;
+  pointer-events: auto;
+}
+
+.tooltip-content {
+  padding: 12px 16px;
+}
+
+.tooltip-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: bold;
+}
+
+.tooltip-content p {
+  margin: 4px 0;
+  font-size: 0.9rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.tooltip-content strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.tooltip-close {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.tooltip-close:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+/* 툴팁 화살표 */
+.custom-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 8px solid transparent;
+  border-top-color: #333;
+}
+
+.custom-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: white;
+  margin-top: -2px;
+}
