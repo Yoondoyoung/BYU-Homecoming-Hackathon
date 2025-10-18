@@ -8,8 +8,8 @@ router.get('/building/:buildingId', async (req, res) => {
   try {
     const { buildingId } = req.params;
 
-    // 건물별 투표 결과 조회
-    const { data: votes, error } = await supabase
+    // 건물별 투표 결과 조회 (Service Role Key 사용하여 RLS 우회)
+    const { data: votes, error } = await supabaseAdmin
       .from('building_votes')
       .select('*')
       .eq('building_id', buildingId);
@@ -55,7 +55,7 @@ router.get('/user/:buildingId', authenticateToken, async (req, res) => {
     const { buildingId } = req.params;
     const userId = req.user.id;
 
-    const { data: userVote, error } = await supabase
+    const { data: userVote, error } = await supabaseAdmin
       .from('building_votes')
       .select('*')
       .eq('building_id', buildingId)
@@ -89,8 +89,11 @@ router.post('/vote', authenticateToken, async (req, res) => {
     const { buildingId, voteOption } = req.body;
     const userId = req.user.id;
 
+    console.log('🗳️  Vote request received:', { buildingId, voteOption, userId });
+
     // 입력 검증
     if (!buildingId || !voteOption) {
+      console.error('❌ Missing required fields:', { buildingId, voteOption });
       return res.status(400).json({ 
         error: 'Missing required fields',
         message: '건물 ID와 투표 옵션은 필수입니다.' 
@@ -104,8 +107,8 @@ router.post('/vote', authenticateToken, async (req, res) => {
       });
     }
 
-    // 기존 투표 확인
-    const { data: existingVote, error: checkError } = await supabase
+    // 기존 투표 확인 (Service Role Key 사용하여 RLS 우회)
+    const { data: existingVote, error: checkError } = await supabaseAdmin
       .from('building_votes')
       .select('*')
       .eq('building_id', buildingId)
@@ -121,8 +124,8 @@ router.post('/vote', authenticateToken, async (req, res) => {
     }
 
     if (existingVote) {
-      // 기존 투표 업데이트
-      const { data: updatedVote, error: updateError } = await supabase
+      // 기존 투표 업데이트 (Service Role Key 사용하여 RLS 우회)
+      const { data: updatedVote, error: updateError } = await supabaseAdmin
         .from('building_votes')
         .update({ 
           vote_option: voteOption,
@@ -145,8 +148,8 @@ router.post('/vote', authenticateToken, async (req, res) => {
         vote: updatedVote
       });
     } else {
-      // 새 투표 생성
-      const { data: newVote, error: insertError } = await supabase
+      // 새 투표 생성 (Service Role Key 사용하여 RLS 우회)
+      const { data: newVote, error: insertError } = await supabaseAdmin
         .from('building_votes')
         .insert({
           building_id: buildingId,
@@ -159,13 +162,15 @@ router.post('/vote', authenticateToken, async (req, res) => {
         .single();
 
       if (insertError) {
-        console.error('Error creating vote:', insertError);
+        console.error('❌ Error creating vote:', insertError);
         return res.status(500).json({ 
           error: 'Failed to create vote',
-          message: '투표 생성에 실패했습니다.' 
+          message: '투표 생성에 실패했습니다.',
+          details: insertError.message
         });
       }
 
+      console.log('✅ Vote created successfully:', newVote);
       res.json({
         message: '투표가 완료되었습니다.',
         vote: newVote
@@ -186,7 +191,7 @@ router.delete('/vote/:buildingId', authenticateToken, async (req, res) => {
     const { buildingId } = req.params;
     const userId = req.user.id;
 
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('building_votes')
       .delete()
       .eq('building_id', buildingId)
@@ -215,7 +220,7 @@ router.delete('/vote/:buildingId', authenticateToken, async (req, res) => {
 // 모든 건물의 투표 결과 조회
 router.get('/all', async (req, res) => {
   try {
-    const { data: votes, error } = await supabase
+    const { data: votes, error } = await supabaseAdmin
       .from('building_votes')
       .select('*');
 
