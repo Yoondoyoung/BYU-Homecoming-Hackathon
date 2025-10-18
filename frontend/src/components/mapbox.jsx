@@ -17,6 +17,8 @@ export default function MapBox() {
   const [nickname, setNickname] = useState('');
   const [showSpotChat, setShowSpotChat] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Spot data (BYU campus example)
   const [spots] = useState([
@@ -207,13 +209,28 @@ export default function MapBox() {
     map.current.addControl(geolocate);
 
     map.current.on("load", () => {
-      addSpotLayers();
-      addRadiusPolygons();
+      console.log("🗺️ Map loaded successfully");
+      try {
+        addSpotLayers();
+        addRadiusPolygons();
+        setIsMapLoaded(true);
+        setIsLoading(false);
+        console.log("✅ Map layers added successfully");
+      } catch (error) {
+        console.error("❌ Error adding map layers:", error);
+        setIsLoading(false);
+      }
+    });
+
+    map.current.on("error", (e) => {
+      console.error("Map error:", e);
+      setIsLoading(false);
     });
 
     navigator.geolocation.watchPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        console.log("📍 User location updated:", latitude, longitude);
         setUserLocation({ lat: latitude, lng: longitude });
       },
       (err) => console.error("GPS Error:", err),
@@ -223,6 +240,12 @@ export default function MapBox() {
 
   // Spot symbol layer 추가
   const addSpotLayers = () => {
+    if (!map.current) {
+      console.warn("Map not initialized yet, skipping spot layers");
+      return;
+    }
+    
+    console.log("Adding spot layers...", spots.length, "spots found");
     const geojson = {
       type: "FeatureCollection",
       features: spots.map((s) => ({
@@ -236,6 +259,8 @@ export default function MapBox() {
         },
       })),
     };
+    
+    console.log("📍 Spot GeoJSON:", geojson);
 
     map.current.addSource("spots", { type: "geojson", data: geojson });
 
@@ -267,6 +292,12 @@ export default function MapBox() {
 
   // 반경 polygon layer 추가
   const addRadiusPolygons = () => {
+    if (!map.current) {
+      console.warn("Map not initialized yet, skipping radius polygons");
+      return;
+    }
+    
+    console.log("Adding radius polygons...");
     const radiusFeatures = spots.map((s) =>
       createCircle([s.lng, s.lat], s.radius)
     );
@@ -291,6 +322,8 @@ export default function MapBox() {
   // Update user location using MapBox's built-in user location (most stable)
   useEffect(() => {
     if (!map.current || !userLocation) return;
+    
+    console.log("🗺️ Updating user location on map:", userLocation);
 
     // Remove existing custom user location source and layers
     if (map.current.getSource('user-location')) {
@@ -391,6 +424,14 @@ export default function MapBox() {
 
   return (
     <div className="map-wrapper">
+      {isLoading && (
+        <div className="map-loading-overlay">
+          <div className="loading-spinner">
+            <div className="spinner"></div>
+            <p>Loading Map...</p>
+          </div>
+        </div>
+      )}
       <div ref={mapContainer} className="map-container-inner" />
       
       {/* Spot Chat Overlay */}
