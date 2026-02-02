@@ -1,4 +1,8 @@
-# BYU Homecoming Hackathon
+# 2025 Fall BYU Homecoming Hackathon
+
+![image1](1760837890041.jpg)
+![image2](1760837890530.jpg)
+![image3](1760837889776.jpg)
 
 React 프론트엔드와 Node.js 백엔드로 구성된 기본적인 웹 애플리케이션입니다.
 
